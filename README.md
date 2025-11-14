@@ -29,6 +29,43 @@ Sui lets us treat each invoice as a “living digital asset” (an object) whose
 - **Verifier / Oracle**: confirms invoice payment (bank confirmation, payment gateway, escrow). Critical trust piece.
 - **Platform (you)**: UI, KYC onboarding, marketplace, escrow integration, optional insurance layer.
 
+#### Core Interaction Flow (Sequence Diagram)
+
+This diagram shows the end-to-end process from invoice creation to final settlement, involving the supplier, financier, and the off-chain oracle.
+
+```mermaid
+sequenceDiagram
+    actor Supplier
+    actor Financier
+    participant Frontend
+    participant Backend (Oracle)
+    participant Sui Blockchain
+
+    %% Invoice Issuance
+    Supplier->>Frontend: 1. Fills out invoice details
+    Frontend->>Backend (Oracle): 2. Requests issuance signature for invoice data
+    Backend (Oracle)->>Frontend: 3. Returns issuance_sig
+    Frontend->>Sui Blockchain: 4. Calls `issue_invoice` with data + issuance_sig
+    Sui Blockchain-->>Frontend: 5. Creates Invoice object (status: Issued)
+
+    %% Invoice Financing
+    Financier->>Frontend: 6. Views available invoices
+    Financier->>Frontend: 7. Clicks "Finance Invoice"
+    Frontend->>Sui Blockchain: 8. Calls `finance_invoice`
+    Sui Blockchain-->>Financier: 9. Transfers discounted amount from Financier
+    Sui Blockchain-->>Frontend: 10. Updates Invoice object (status: Financed)
+
+    %% Invoice Settlement
+    participant Buyer
+    Buyer->>Backend (Oracle): 11. Pays invoice off-chain (trigger)
+    Backend (Oracle)->>Backend (Oracle): 12. Generates payment_sig
+    Frontend->>Backend (Oracle): 13. Requests payment signature for paid invoice
+    Backend (Oracle)->>Frontend: 14. Returns payment_sig
+    Frontend->>Sui Blockchain: 15. Calls `confirm_payment` with payment_sig
+    Sui Blockchain-->>Financier: 16. Transfers full invoice amount to Financier
+    Sui Blockchain-->>Frontend: 17. Updates Invoice object (status: Paid)
+```
+
 ### Minimum trust model
 You cannot and should not put PII or raw bank data on chain. Real deployments require legal agreements and KYC.
 - Keep **only hashes and non-PII metadata** on chain.
