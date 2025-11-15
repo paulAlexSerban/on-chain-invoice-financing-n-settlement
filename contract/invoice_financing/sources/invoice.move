@@ -33,6 +33,9 @@ public fun create_invoice_internal(
     fee_bps: u64,
     ctx: &mut TxContext,
 ): Invoice {
+
+    //todo validate params
+    
     Invoice {
         id: object::new(ctx),
         buyer,
