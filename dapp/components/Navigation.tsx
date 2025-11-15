@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Coins, Menu, X, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { ConnectButton } from "@mysten/wallet-kit";
 
 const Navigation = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -74,9 +75,7 @@ const Navigation = () => {
               )}
               {!mounted && <Sun className="h-5 w-5" />}
             </Button>
-            <Button variant="outline" size="sm">
-              Connect Wallet
-            </Button>
+            <ConnectButton />
           </div>
 
           {/* Mobile Menu Button */}
@@ -142,9 +141,9 @@ const Navigation = () => {
                 )}
                 {!mounted && <Sun className="h-5 w-5" />}
               </Button>
-              <Button variant="outline" size="sm" className="flex-1">
-                Connect Wallet
-              </Button>
+              <div className="flex-1">
+                <ConnectButton />
+              </div>
             </div>
           </div>
         )}
