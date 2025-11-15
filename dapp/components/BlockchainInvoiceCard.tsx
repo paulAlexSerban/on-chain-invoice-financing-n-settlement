@@ -3,8 +3,9 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Building2, DollarSign, Clock, TrendingDown, ExternalLink, Shield, CheckCircle } from "lucide-react";
+import { Calendar, Building2, Clock, TrendingDown, ExternalLink, Shield, CheckCircle } from "lucide-react";
 import { OnChainInvoice, getStatusLabel, getStatusColor, formatDate, getDaysUntilDue } from "@/types/invoice";
+import SUILogo from "./ui/sui-logo";
 
 interface BlockchainInvoiceCardProps {
   invoice: OnChainInvoice;
@@ -68,7 +69,7 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
         {/* Amount */}
         <div className="flex items-center justify-between p-3 bg-primary/5 rounded-md">
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-primary" />
+            <SUILogo className="h-4 w-4 text-primary" />
             <span className="text-sm text-muted-foreground">Invoice Amount</span>
           </div>
           <span className="font-bold text-lg">

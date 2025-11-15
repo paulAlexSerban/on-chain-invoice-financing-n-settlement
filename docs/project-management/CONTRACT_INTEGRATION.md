@@ -83,9 +83,9 @@ const { data: invoices } = useSharedInvoices({
 
 ### Required Environment Variables
 
-**`dapp/.env.local`**:
+**`dapp/.env`**:
 ```env
-NEXT_PUBLIC_PACKAGE_ID=0x8178a3ff4cdc74fbc18c435181ec0c58dde5b817237fd413b297838f295d6588
+NEXT_PUBLIC_CONTRACT_ID=0x8178a3ff4cdc74fbc18c435181ec0c58dde5b817237fd413b297838f295d6588
 NEXT_PUBLIC_FACTORY_OBJECT_ID=0x...  # ⚠️ NEEDED!
 NEXT_PUBLIC_NETWORK=testnet
 ```
@@ -227,7 +227,7 @@ Examples:
 
 1. **✅ Get Factory Object ID**
    - Query published package
-   - Add to `.env.local`
+   - Add to `.env`
    - Frontend will work!
 
 2. **🔄 Update Form**
@@ -249,7 +249,7 @@ Examples:
 ## Troubleshooting
 
 ### "Factory Object ID not configured"
-**Solution**: Get factory object ID from published package and add to `.env.local`
+**Solution**: Get factory object ID from published package and add to `.env`
 
 ### "Buyer address invalid"
 **Solution**: Buyer must be valid Sui address (66 chars, starts with 0x)

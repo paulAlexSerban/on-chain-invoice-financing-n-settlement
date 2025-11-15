@@ -14,7 +14,7 @@ export function useSupplierRegistration() {
   
   const [isLoading, setIsLoading] = useState(false);
 
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID || "";
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID || "";
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({

@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Loader2, TrendingUp, FileText, DollarSign, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, TrendingUp, FileText, AlertCircle } from "lucide-react";
+import SUILogo from "@/components/ui/sui-logo";
 
 const Marketplace = () => {
   const [filters, setFilters] = useState<InvoiceFilters>({
@@ -107,7 +108,7 @@ const Marketplace = () => {
                     <p className="text-sm text-muted-foreground">Total Value</p>
                     <p className="text-2xl font-bold">{totalValue.toFixed(2)} SUI</p>
                   </div>
-                  <DollarSign className="h-8 w-8 text-muted-foreground" />
+                  <SUILogo   className="h-8 w-8 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -165,7 +166,7 @@ const Marketplace = () => {
                   <div className="flex-1 flex items-end">
                     <Button
                       variant="ghost"
-                      onClick={() => setFilters({ status: 'pending', sortBy: 'createdAt', sortOrder: 'desc' })}
+                      onClick={() => setFilters({ status: 'created', sortBy: 'createdAt', sortOrder: 'desc' })}
                       className="w-full"
                     >
                       Reset Filters
@@ -241,7 +242,7 @@ const Marketplace = () => {
                       <BlockchainInvoiceCard
                         key={invoice.id}
                         invoice={invoice}
-                        onFinance={invoice.status === InvoiceStatus.PENDING ? handleFinance : undefined}
+                        onFinance={invoice.status === InvoiceStatus.CREATED ? handleFinance : undefined}
                         onViewDetails={handleViewDetails}
                       />
                     ))}

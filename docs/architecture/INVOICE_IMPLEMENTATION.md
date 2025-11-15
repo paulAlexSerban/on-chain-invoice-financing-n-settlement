@@ -88,9 +88,9 @@ Copy this Package ID!
 
 ### Step 2: Configure Frontend
 
-Create `dapp/.env.local`:
+Create `dapp/.env`:
 ```env
-NEXT_PUBLIC_PACKAGE_ID=0xYOUR_PACKAGE_ID_HERE
+NEXT_PUBLIC_CONTRACT_ID=0xYOUR_PACKAGE_ID_HERE
 NEXT_PUBLIC_NETWORK=testnet
 ```
 
@@ -306,7 +306,7 @@ export default function BusinessDashboard() {
 ## Troubleshooting
 
 ### Issue: "Package ID not configured"
-**Solution:** Set `NEXT_PUBLIC_PACKAGE_ID` in `.env.local`
+**Solution:** Set `NEXT_PUBLIC_CONTRACT_ID` in `.env`
 
 ### Issue: Transaction fails
 **Solutions:**

@@ -1,6 +1,13 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { FileText, DollarSign, Clock, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  FileText,
+  Clock,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle,
+} from "lucide-react";
+import SUILogo from "@/components/ui/sui-logo";
 import { useWalletKit } from "@mysten/wallet-kit";
 import Navigation from "@/components/Navigation";
 import StatsOverview, { StatsOverviewProps } from "@/components/StatsOverview";
@@ -13,35 +20,50 @@ import { InvoiceData } from "@/components/InvoiceCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DebugPanel } from "@/components/DebugPanel";
 import { useMyInvoices } from "@/hooks/useInvoices";
-import { OnChainInvoice, InvoiceStatus, formatDate, getDaysUntilDue } from "@/types/invoice";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  OnChainInvoice,
+  InvoiceStatus,
+  formatDate,
+  getDaysUntilDue,
+} from "@/types/invoice";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
 
 const BusinessDashboard = () => {
   const { currentAccount } = useWalletKit();
   const { data: myInvoices, isLoading, error, refetch } = useMyInvoices();
-  const [kycStatus, setKycStatus] = useState<'approved' | 'pending' | 'rejected' | 'loading'>('loading');
+  const [kycStatus, setKycStatus] = useState<
+    "approved" | "pending" | "rejected" | "loading"
+  >("loading");
+  const [activeTab, setActiveTab] = useState<string>("active");
 
   // Fetch KYC status when wallet connects
   useEffect(() => {
     const fetchKYCStatus = async () => {
       if (!currentAccount?.address) {
-        setKycStatus('loading');
+        setKycStatus("loading");
         return;
       }
 
       try {
-        const response = await fetch(`/api/kyc/status/${currentAccount.address}`);
+        const response = await fetch(
+          `/api/kyc/status/${currentAccount.address}`
+        );
         if (response.ok) {
           const data = await response.json();
           setKycStatus(data.status);
         } else {
           // Auto-submit KYC if not found (MVP behavior)
-          const submitResponse = await fetch('/api/kyc/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const submitResponse = await fetch("/api/kyc/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: currentAccount.address }),
           });
           if (submitResponse.ok) {
@@ -50,8 +72,8 @@ const BusinessDashboard = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching KYC status:', error);
-        setKycStatus('pending');
+        console.error("Error fetching KYC status:", error);
+        setKycStatus("pending");
       }
     };
 
@@ -71,17 +93,26 @@ const BusinessDashboard = () => {
       };
     }
 
-    const active = myInvoices.filter(inv => 
-      inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.FUNDED
+    const active = myInvoices.filter(
+      (inv) =>
+        inv.status === InvoiceStatus.CREATED ||
+        inv.status === InvoiceStatus.FINANCED
     );
-    const settled = myInvoices.filter(inv => inv.status === InvoiceStatus.REPAID);
-    const financed = myInvoices.filter(inv => 
-      inv.status === InvoiceStatus.FUNDED || inv.status === InvoiceStatus.REPAID
+    const settled = myInvoices.filter(
+      (inv) => inv.status === InvoiceStatus.PAID
+    );
+    const financed = myInvoices.filter(
+      (inv) =>
+        inv.status === InvoiceStatus.FINANCED ||
+        inv.status === InvoiceStatus.PAID
     );
 
-    const totalFinanced = financed.reduce((sum, inv) => sum + (inv.financedAmountInSui || 0), 0);
+    const totalFinanced = financed.reduce(
+      (sum, inv) => sum + (inv.financedAmountInSui || 0),
+      0
+    );
     const pendingAmount = active.reduce((sum, inv) => sum + inv.amountInSui, 0);
-    
+
     // Calculate average discount (mock for now, as we don't have discount data on-chain)
     const avgDiscount = 3.5; // Default mock value
 
@@ -104,7 +135,7 @@ const BusinessDashboard = () => {
     },
     {
       title: "Total Financed",
-      icon: DollarSign,
+      icon: SUILogo,
       value: `${stats.totalFinanced.toFixed(2)} SUI`,
       description: "Lifetime value",
     },
@@ -126,18 +157,20 @@ const BusinessDashboard = () => {
   // Convert OnChainInvoice to InvoiceData format for display
   const convertToInvoiceData = (invoice: OnChainInvoice): InvoiceData => {
     const statusMap: Record<number, "financed" | "listed" | "settled"> = {
-      [InvoiceStatus.PENDING]: "listed",
-      [InvoiceStatus.FUNDED]: "financed",
-      [InvoiceStatus.REPAID]: "settled",
+      [InvoiceStatus.CREATED]: "listed",
+      [InvoiceStatus.FINANCED]: "financed",
+      [InvoiceStatus.PAID]: "settled",
       [InvoiceStatus.DEFAULTED]: "settled",
     };
 
     // Use new contract fields if available, fallback to legacy fields
-    const receivedAmount = invoice.status === InvoiceStatus.FUNDED || invoice.status === InvoiceStatus.REPAID
-      ? (invoice.supplierReceivedInSui || invoice.financedAmountInSui)
-      : undefined;
+    const receivedAmount =
+      invoice.status === InvoiceStatus.FINANCED ||
+      invoice.status === InvoiceStatus.PAID
+        ? invoice.supplierReceivedInSui || invoice.financedAmountInSui
+        : undefined;
 
-    const calculatedDiscount = invoice.discountRateBps 
+    const calculatedDiscount = invoice.discountRateBps
       ? parseFloat(invoice.discountRateBps) / 100 // Convert basis points to percentage
       : 5; // Mock default
 
@@ -147,10 +180,16 @@ const BusinessDashboard = () => {
       clientName: invoice.buyer.substring(0, 20) + "...", // Truncated buyer info
       amount: invoice.amountInSui,
       receivedAmount,
-      expectedAmount: invoice.status === InvoiceStatus.PENDING ? invoice.amountInSui * 0.95 : undefined,
+      expectedAmount:
+        invoice.status === InvoiceStatus.CREATED
+          ? invoice.amountInSui * 0.95
+          : undefined,
       discount: calculatedDiscount,
       dueDate: formatDate(invoice.dueDate),
-      settledDate: invoice.status === InvoiceStatus.REPAID ? formatDate(invoice.dueDate) : undefined,
+      settledDate:
+        invoice.status === InvoiceStatus.PAID
+          ? formatDate(invoice.dueDate)
+          : undefined,
       status: statusMap[invoice.status] || "listed",
     };
   };
@@ -159,8 +198,10 @@ const BusinessDashboard = () => {
   const activeInvoices = useMemo(() => {
     if (!myInvoices) return [];
     return myInvoices
-      .filter(inv => 
-        inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.FUNDED
+      .filter(
+        (inv) =>
+          inv.status === InvoiceStatus.CREATED ||
+          inv.status === InvoiceStatus.FINANCED
       )
       .map(convertToInvoiceData);
   }, [myInvoices]);
@@ -168,7 +209,7 @@ const BusinessDashboard = () => {
   const settledInvoices = useMemo(() => {
     if (!myInvoices) return [];
     return myInvoices
-      .filter(inv => inv.status === InvoiceStatus.REPAID)
+      .filter((inv) => inv.status === InvoiceStatus.PAID)
       .map(convertToInvoiceData);
   }, [myInvoices]);
 
@@ -202,7 +243,8 @@ const BusinessDashboard = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Click the "Connect Wallet" button in the navigation to get started.
+                  Click the "Connect Wallet" button in the navigation to get
+                  started.
                 </p>
               </CardContent>
             </Card>
@@ -219,14 +261,10 @@ const BusinessDashboard = () => {
       <div className="pt-24 pb-20 px-4">
         <div className="container mx-auto max-w-7xl">
           <DashboardHeader
-            title="Business Dashboard"
+            title="Seller/Business Dashboard"
             description="Manage your invoices and track financing status"
             buttonText="New Invoice"
-            onButtonClick={() => {
-              // Navigate to create tab
-              const createTab = document.querySelector('[value="create"]') as HTMLElement;
-              createTab?.click();
-            }}
+            onButtonClick={() => setActiveTab("create")}
           />
 
           {/* Debug Panel */}
@@ -235,27 +273,36 @@ const BusinessDashboard = () => {
           </div>
 
           {/* KYC Status Banner */}
-          {kycStatus !== 'loading' && (
-            <Card className={`mb-6 ${kycStatus === 'approved' ? 'border-green-500/50' : 'border-yellow-500/50'}`}>
+          {kycStatus !== "loading" && (
+            <Card
+              className={`mb-6 ${
+                kycStatus === "approved"
+                  ? "border-green-500/50"
+                  : "border-yellow-500/50"
+              }`}
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  {kycStatus === 'approved' ? (
+                  {kycStatus === "approved" ? (
                     <CheckCircle className="h-5 w-5 text-green-500" />
                   ) : (
                     <AlertCircle className="h-5 w-5 text-yellow-500" />
                   )}
                   <div className="flex-1">
                     <p className="font-medium">
-                      {kycStatus === 'approved' ? 'KYC Verified' : 'KYC Pending'}
+                      {kycStatus === "approved"
+                        ? "KYC Verified"
+                        : "KYC Pending"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {kycStatus === 'approved' 
-                        ? 'Your account is verified and ready to create invoices'
-                        : 'Your KYC verification is being processed'
-                      }
+                      {kycStatus === "approved"
+                        ? "Your account is verified and ready to create invoices"
+                        : "Your KYC verification is being processed"}
                     </p>
                   </div>
-                  <Badge variant={kycStatus === 'approved' ? 'default' : 'secondary'}>
+                  <Badge
+                    variant={kycStatus === "approved" ? "default" : "secondary"}
+                  >
                     {kycStatus.toUpperCase()}
                   </Badge>
                 </div>
@@ -269,7 +316,9 @@ const BusinessDashboard = () => {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-center gap-2">
                   <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
-                  <p className="text-muted-foreground">Loading your invoices from blockchain...</p>
+                  <p className="text-muted-foreground">
+                    Loading your invoices from blockchain...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -282,9 +331,13 @@ const BusinessDashboard = () => {
                 <div className="flex items-center gap-3">
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   <div>
-                    <p className="font-medium text-red-500">Error Loading Invoices</p>
+                    <p className="font-medium text-red-500">
+                      Error Loading Invoices
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      {error instanceof Error ? error.message : 'Failed to fetch invoices from blockchain'}
+                      {error instanceof Error
+                        ? error.message
+                        : "Failed to fetch invoices from blockchain"}
                     </p>
                   </div>
                 </div>
@@ -301,15 +354,27 @@ const BusinessDashboard = () => {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Platform Performance</p>
+                    <p className="text-sm text-muted-foreground">
+                      Platform Performance
+                    </p>
                     <p className="text-2xl font-bold">
-                      {myInvoices.filter(inv => inv.status !== InvoiceStatus.PENDING).length} of {myInvoices.length} Financed
+                      {
+                        myInvoices.filter(
+                          (inv) => inv.status !== InvoiceStatus.CREATED
+                        ).length
+                      }{" "}
+                      of {myInvoices.length} Financed
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Time to Funding (Avg)</p>
+                    <p className="text-sm text-muted-foreground">
+                      Time to Funding (Avg)
+                    </p>
                     <p className="text-lg font-semibold text-primary">
-                      ~35s <span className="text-sm text-muted-foreground">(estimated)</span>
+                      ~35s{" "}
+                      <span className="text-sm text-muted-foreground">
+                        (estimated)
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -317,7 +382,12 @@ const BusinessDashboard = () => {
             </Card>
           )}
 
-          <Tabs defaultValue="active" className="space-y-6">
+          <Tabs
+            defaultValue="active"
+            className="space-y-6"
+            value={activeTab}
+            onValueChange={setActiveTab}
+          >
             <TabsList>
               <TabsTrigger value="active">
                 Active Invoices ({activeInvoices.length})
@@ -334,14 +404,14 @@ const BusinessDashboard = () => {
                   <CardContent className="pt-6">
                     <div className="text-center py-8">
                       <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                      <h3 className="text-lg font-semibold mb-2">No Active Invoices</h3>
+                      <h3 className="text-lg font-semibold mb-2">
+                        No Active Invoices
+                      </h3>
                       <p className="text-muted-foreground mb-4">
-                        Create your first invoice to get started with invoice financing
+                        Create your first invoice to get started with invoice
+                        financing
                       </p>
-                      <Button onClick={() => {
-                        const createTab = document.querySelector('[value="create"]') as HTMLElement;
-                        createTab?.click();
-                      }}>
+                      <Button onClick={() => setActiveTab("create")}>
                         Create Invoice
                       </Button>
                     </div>
@@ -362,7 +432,9 @@ const BusinessDashboard = () => {
                   <CardContent className="pt-6">
                     <div className="text-center py-8">
                       <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                      <h3 className="text-lg font-semibold mb-2">No Settled Invoices</h3>
+                      <h3 className="text-lg font-semibold mb-2">
+                        No Settled Invoices
+                      </h3>
                       <p className="text-muted-foreground">
                         Settled invoices will appear here once they are repaid
                       </p>
@@ -379,17 +451,19 @@ const BusinessDashboard = () => {
             </TabsContent>
 
             <TabsContent value="create">
-              <CreateInvoiceForm 
+              <CreateInvoiceForm
                 onSuccess={(invoiceId) => {
-                  console.log('Invoice created:', invoiceId);
+                  console.log("Invoice created:", invoiceId);
                   // Refetch invoices after successful creation
                   setTimeout(() => refetch(), 2000);
                   // Switch to active tab
                   setTimeout(() => {
-                    const activeTab = document.querySelector('[value="active"]') as HTMLElement;
+                    const activeTab = document.querySelector(
+                      '[value="active"]'
+                    ) as HTMLElement;
                     activeTab?.click();
                   }, 2500);
-                }} 
+                }}
               />
             </TabsContent>
           </Tabs>

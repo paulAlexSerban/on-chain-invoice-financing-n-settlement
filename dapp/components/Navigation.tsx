@@ -61,7 +61,7 @@ const Navigation = () => {
               href="/dashboard/settle"
               className="text-sm font-medium hover:text-primary transition-colors"
             >
-              Settle Invoices
+              For Buyers
             </Link>
             <Button
               variant="ghost"

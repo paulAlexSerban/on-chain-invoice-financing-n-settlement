@@ -19,7 +19,7 @@ Your fee-based invoice financing platform is fully deployed and ready for testin
 
 ### 💻 Frontend
 
-- ✅ **Environment configured** ([.env.local](dapp/.env.local))
+- ✅ **Environment configured** ([.env](dapp/.env))
 - ✅ **UI components created** (Alert, Separator, Dialog)
 - ✅ **Finance modal implemented** with transparent fee breakdown
 - ✅ **Dev server running** (check terminal for port)
@@ -221,7 +221,7 @@ npm run dev
 - ✅ Check wallet has enough SUI (amount + gas)
 - ✅ Verify invoice is PENDING status
 - ✅ Ensure discount rate is reasonable (1-10%)
-- ✅ Check Platform ID is correct in .env.local
+- ✅ Check Platform ID is correct in .env
 
 ### Modal Won't Open
 - ✅ Hard refresh browser (Ctrl+Shift+R)

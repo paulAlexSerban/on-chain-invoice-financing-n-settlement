@@ -226,10 +226,10 @@ GET /api/invoices?status=ISSUED
 
 ## 🔧 Environment Configuration
 
-Ensure these are set in `.env.local`:
+Ensure these are set in `.env`:
 
 ```env
-NEXT_PUBLIC_PACKAGE_ID=0x4d3f0eeb160eaff90fafc34654457604bdce0ff38775f45f87561f5469aeac12
+NEXT_PUBLIC_CONTRACT_ID=0x4d3f0eeb160eaff90fafc34654457604bdce0ff38775f45f87561f5469aeac12
 NEXT_PUBLIC_NETWORK=testnet
 ```
 

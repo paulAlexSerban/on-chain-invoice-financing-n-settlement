@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Wallet, PieChart } from "lucide-react";
+import { TrendingUp, Wallet, PieChart } from "lucide-react";
+import SUILogo from "./ui/sui-logo";
 
 export interface PortfolioStats {
   totalInvested: string;
@@ -61,7 +62,7 @@ const PortfolioStatsCards = ({ stats = defaultStats }: PortfolioStatsCardsProps)
       <Card>
         <CardHeader className="pb-2">
           <CardDescription className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
+            <SUILogo className="h-4 w-4" />
             Active Value
           </CardDescription>
           <CardTitle className="text-3xl">{stats.activeValue}</CardTitle>

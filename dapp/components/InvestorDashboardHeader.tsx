@@ -4,7 +4,7 @@ interface InvestorDashboardHeaderProps {
 }
 
 const InvestorDashboardHeader = ({
-  title = "Investor Dashboard",
+  title = "Financer/Investor Dashboard",
   description = "Track your portfolio and investment performance",
 }: InvestorDashboardHeaderProps) => {
   return (

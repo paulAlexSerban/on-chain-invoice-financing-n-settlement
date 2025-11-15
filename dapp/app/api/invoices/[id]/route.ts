@@ -32,7 +32,7 @@ export async function GET(
     }
 
     // Setup blockchain connection
-    const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+    const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
     const network = process.env.NEXT_PUBLIC_NETWORK || 'testnet';
 
     if (!packageId) {

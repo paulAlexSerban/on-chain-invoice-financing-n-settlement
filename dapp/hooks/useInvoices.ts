@@ -12,7 +12,7 @@ import {
 
 export function useInvoices(filters?: InvoiceFilters) {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -288,7 +288,7 @@ export function useInvoice(invoiceId: string) {
 // This works even after invoices are financed and ownership transfers
 export function useMyInvoices() {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -445,7 +445,7 @@ export function useMyInvoices() {
 // Hook to fetch invoices financed by the current user
 export function useMyInvestments() {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -597,7 +597,7 @@ export function useMyInvestments() {
 // These are invoices the user needs to settle/pay
 export function useMyPayableInvoices() {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({

@@ -228,14 +228,14 @@ Dashboard State → InvestmentList → InvestmentCard → User Action
 Required environment variables:
 ```env
 NEXT_PUBLIC_NETWORK=testnet
-NEXT_PUBLIC_PACKAGE_ID=0x...
+NEXT_PUBLIC_CONTRACT_ID=0x...
 NEXT_PUBLIC_PLATFORM_ID=0x...  # Shared Platform object
 ```
 
 ## Next Steps
 
 1. **Add Environment Variables**
-   - Set `NEXT_PUBLIC_PLATFORM_ID` in `.env.local`
+   - Set `NEXT_PUBLIC_PLATFORM_ID` in `.env`
    - Get Platform ID from contract deployment
 
 2. **Test UI Locally**

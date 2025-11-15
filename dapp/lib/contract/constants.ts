@@ -9,7 +9,7 @@
 
 export const CONTRACT_ADDRESSES = {
   // Package ID from deployment
-  PACKAGE_ID: process.env.NEXT_PUBLIC_PACKAGE_ID || '0x2317bdda09d8e73272f3dc2f96245f2b854eb3fa246099edb6cacd84d757aba4',
+  PACKAGE_ID: process.env.NEXT_PUBLIC_CONTRACT_ID || '0x2317bdda09d8e73272f3dc2f96245f2b854eb3fa246099edb6cacd84d757aba4',
   
   // Treasury ID (shared object)
   TREASURY_ID: process.env.NEXT_PUBLIC_TREASURY_ID || '',
@@ -165,7 +165,7 @@ export const SHARED_OBJECTS = {
 
 export const ERROR_MESSAGES = {
   // Configuration
-  PACKAGE_NOT_CONFIGURED: 'Package ID not configured. Please check .env.local',
+  PACKAGE_NOT_CONFIGURED: 'Package ID not configured. Please check .env',
   WALLET_NOT_CONNECTED: 'Wallet not connected. Please connect your wallet first.',
   NETWORK_MISMATCH: 'Wrong network. Please switch to ',
   
@@ -257,7 +257,7 @@ export function validateConfiguration(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   if (!CONTRACT_ADDRESSES.PACKAGE_ID || CONTRACT_ADDRESSES.PACKAGE_ID === '0x0') {
-    errors.push('NEXT_PUBLIC_PACKAGE_ID not configured');
+    errors.push('NEXT_PUBLIC_CONTRACT_ID not configured');
   }
   
   // Invoice factory is optional for now (created at deployment)

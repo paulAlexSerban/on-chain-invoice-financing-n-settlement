@@ -15,7 +15,7 @@ import { OnChainInvoice, formatSuiAmount, InvoiceFilters, InvoiceStatus } from "
  */
 export function useSharedInvoices(filters?: InvoiceFilters) {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const factoryObjectId = process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 

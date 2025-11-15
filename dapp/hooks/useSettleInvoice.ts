@@ -19,7 +19,7 @@ export function useSettleInvoice() {
   const [isSettling, setIsSettling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const platformId = process.env.NEXT_PUBLIC_PLATFORM_ID;
 
   const settleInvoice = async ({ invoiceId, amount }: SettleInvoiceParams) => {

@@ -35,7 +35,7 @@ https://suiscan.xyz/testnet/object/0x4d3f0eeb160eaff90fafc34654457604bdce0ff3877
 ## Frontend Configuration
 
 The frontend is already configured with this Package ID in:
-- `dapp/.env.local`
+- `dapp/.env`
 
 ## Test the Contract
 

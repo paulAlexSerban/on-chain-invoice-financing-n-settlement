@@ -369,7 +369,7 @@ Investors just monitor, no settlement action
 
 ```env
 NEXT_PUBLIC_NETWORK=testnet
-NEXT_PUBLIC_PACKAGE_ID=0x...     # Deployed contract
+NEXT_PUBLIC_CONTRACT_ID=0x...     # Deployed contract
 NEXT_PUBLIC_PLATFORM_ID=0x...    # Platform shared object
 ```
 

@@ -82,7 +82,7 @@ function install() {
 
 function build_contract() {
   echo "Building the Move contract..."
-  $SUI_BIN move build --path ./contract/$MODULE_NAME
+  $SUI_BIN move build --path ./contract/$CONTRACT_DIR
   if [ $? -ne 0 ]; then
     echo "Error: Failed to build the Move contract."
     exit 1
@@ -92,7 +92,7 @@ function build_contract() {
 
 function test_contract() {
   echo "Running tests for the Move contract..."
-  $SUI_BIN move test --path ./contract/$MODULE_NAME
+  $SUI_BIN move test --path ./contract/$CONTRACT_DIR
   if [ $? -ne 0 ]; then
     echo "Error: Tests failed."
     exit 1
@@ -102,15 +102,13 @@ function test_contract() {
 
 function publish_contract() {
   echo "Publishing contract..."
-  local OUTPUT=$($SUI_BIN client publish --gas-budget $GAS_BUDGET ./contract/$MODULE_NAME 2>&1)
-  echo "$OUTPUT"
+  local OUTPUT=$($SUI_BIN client publish --gas-budget $GAS_BUDGET ./contract/$CONTRACT_DIR 2>&1)
+  mkdir -p publish_logs
+  echo "$OUTPUT" >> publish_logs/publish_output-$(date +%Y%m%d%H%M%S).log
   
   local PACKAGE_ID=$(echo "$OUTPUT" | grep -oE 'PackageID: 0x[a-f0-9]+' | awk '{print $2}')
-  local UPGRADE_CAP_ID=$(echo "$OUTPUT" | grep -A 20 "UpgradeCap" | grep -oE '│ ObjectID: 0x[a-f0-9]+' | head -1 | awk '{print $3}')
-  local FACTORY_OBJECT_ID=$(echo "$OUTPUT" | grep -B 3 "invoice_factory::InvoiceFactory" | grep -oE 'ObjectID: 0x[a-f0-9]+' | head -1 | awk '{print $2}')
+
   echo "Extracted PACKAGE_ID: $PACKAGE_ID"
-  echo "Extracted UPGRADE_CAP_ID: $UPGRADE_CAP_ID"
-  echo "Extracted FACTORY_OBJECT_ID: $FACTORY_OBJECT_ID"
   if [ -n "$PACKAGE_ID" ]; then
     echo ""
     echo " [ SUCCESS ] Published package with ID: $PACKAGE_ID"
@@ -126,100 +124,30 @@ function publish_contract() {
     echo " [ ERROR ] Failed to extract Package ID from output"
     exit 1
   fi
-
-  if [ -n "$UPGRADE_CAP_ID" ]; then
-    echo " [ SUCCESS ] UpgradeCap object ID: $UPGRADE_CAP_ID"
-    # if macos
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/^UPGRADE_CAP_ID=.*/UPGRADE_CAP_ID=$UPGRADE_CAP_ID/" "$ENV_FILE"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-      sed -i "s/^UPGRADE_CAP_ID=.*/UPGRADE_CAP_ID=$UPGRADE_CAP_ID/" "$ENV_FILE"
-    fi
-  fi
-
-  if [ -n "$FACTORY_OBJECT_ID" ]; then
-    echo " [ SUCCESS ] Factory Object ID: $FACTORY_OBJECT_ID"
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-      sed -i "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
-    fi
-    echo ""
-    echo "Add this to your dapp/.env.local file:"
-    echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID"
-    # Update frontend .env.local if it exists
-    if [ -f "dapp/.env.local" ]; then
-      if grep -q "^NEXT_PUBLIC_FACTORY_OBJECT_ID=" dapp/.env.local; then
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          sed -i '' "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
-        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-          sed -i "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
-        fi
-      else
-        echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID" >> dapp/.env.local
-      fi
-    fi
-  else
-    echo " [ WARNING ] Could not extract Factory Object ID from output"
-    echo " [ INFO ] You can find it manually with:"
-    echo "   sui client objects | grep -A 5 InvoiceFactory"
-    echo " Then add it to .env as:"
-    echo "   FACTORY_OBJECT_ID=0x..."
-  fi
-}
-
-# @TODO: the contract upgrade is not working yet - ERROR: "unexpected end of input"
-function upgrade_contract() {
-  if [ -z "$PACKAGE_ID" ]; then
-    echo "Error: PACKAGE_ID not set. Deploy first with: ./scripts.bash publish_contract"
-    exit 1
-  fi
-  
-  if [ -z "$UPGRADE_CAP_ID" ]; then
-    echo "Error: UPGRADE_CAP_ID not set in .env"
-    echo "Find your UpgradeCap object ID with:"
-    echo "  sui client objects | grep -i upgradecap"
-    exit 1
-  fi
-  
-  echo "Upgrading contract with UpgradeCap $UPGRADE_CAP_ID..."
-  
-  $SUI_BIN client upgrade --gas-budget ${GAS_BUDGET} \
-    --upgrade-capability ${UPGRADE_CAP_ID} \
-    "./contract/$MODULE_NAME"
-  
-  echo "$OUTPUT"
-  
-  if [ $? -ne 0 ]; then
-    echo " [ ERROR ] Contract upgrade failed"
-    exit 1
-  fi
 }
 
 function start_dev_server() {
   echo "Starting Next.js development server..."
   
-  # Create or update dapp/.env.local with values from root .env
-  echo "Syncing environment variables to dapp/.env.local..."
+  # Create or update dapp/.env with values from root .env
+  echo "Syncing environment variables to dapp/.env..."
   
-  cat > ./dapp/.env.local << EOF
+  cat > ./dapp/.env << EOF
 # Auto-generated from root .env file
 # Last updated: $(date)
 
 # Package ID from contract deployment
-NEXT_PUBLIC_PACKAGE_ID=$PACKAGE_ID
+NEXT_PUBLIC_CONTRACT_ID=${PACKAGE_ID:-}
+NEXT_PUBLIC_OWNER_ADDRESS=${ACTIVE_ADDRESS:-}
+NEXT_PUBLIC_FACTORY_OBJECT_ID=${INVOICE_FACTORY_ID:-}
+NEXT_PUBLIC_TREASURY_ID=${TREASURY_ID:-}
 
 # Network configuration
-NEXT_PUBLIC_NETWORK=$SUI_NETWORK
+NEXT_PUBLIC_NETWORK=${SUI_NETWORK:-}
 
-# Factory Object ID
-NEXT_PUBLIC_FACTORY_OBJECT_ID=${FACTORY_OBJECT_ID:-}
-
-# Active address
-NEXT_PUBLIC_ACTIVE_ADDRESS=$ACTIVE_ADDRESS
 EOF
   
-  echo "✅ Environment variables synced to dapp/.env.local"
+  echo "Environment variables synced to dapp/.env"
   
   cd ./dapp || exit
   yarn dev

@@ -28,7 +28,7 @@ Publish the contract with the `invoice_financing` module:
 make publish_contract
 ```
 
-Then update `.env.local` with new Package ID.
+Then update `.env` with new Package ID.
 
 ### Option 3: Verify Package ID
 Check if the package ID matches what's deployed:
@@ -59,9 +59,9 @@ Your contract has these modules:
    make publish_contract
    ```
 
-2. **Update frontend package ID** in `dapp/.env.local`:
+2. **Update frontend package ID** in `dapp/.env`:
    ```env
-   NEXT_PUBLIC_PACKAGE_ID=<new_package_id>
+   NEXT_PUBLIC_CONTRACT_ID=<new_package_id>
    ```
 
 3. **Restart dev server**:

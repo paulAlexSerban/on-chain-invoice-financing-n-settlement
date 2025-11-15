@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp,
   Clock,
-  DollarSign,
   Building,
 } from "lucide-react";
+import SUILogo from "./ui/sui-logo";
 
 export interface MarketplaceInvoice {
   id: string;
@@ -67,7 +67,7 @@ const MarketplaceInvoiceCard = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                  <DollarSign className="h-3 w-3" />
+                  <SUILogo className="h-3 w-3" />
                   Invoice Amount
                 </div>
                 <div className="font-semibold">
@@ -87,7 +87,7 @@ const MarketplaceInvoiceCard = ({
 
               <div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                  <DollarSign className="h-3 w-3" />
+                  <SUILogo className="h-3 w-3" />
                   Your Investment
                 </div>
                 <div className="font-semibold">

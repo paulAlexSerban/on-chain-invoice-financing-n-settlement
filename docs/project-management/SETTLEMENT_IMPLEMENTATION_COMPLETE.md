@@ -327,7 +327,7 @@ sui client call \
 
 2. **Add NEXT_PUBLIC_PLATFORM_ID to Environment**
    ```bash
-   # In .env.local
+   # In .env
    NEXT_PUBLIC_PLATFORM_ID=0x...
    ```
 

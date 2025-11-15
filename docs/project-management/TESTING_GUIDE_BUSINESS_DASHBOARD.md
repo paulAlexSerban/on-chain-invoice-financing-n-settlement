@@ -9,7 +9,7 @@
 
 ### Prerequisites
 - Wallet connected to testnet
-- Contract deployed with package ID in `.env.local`
+- Contract deployed with package ID in `.env`
 - Dev server running (`npm run dev`)
 
 ---
@@ -132,7 +132,7 @@ When you open the Business Dashboard, you should see in browser console:
    - Or contract not emitting `InvoiceCreated` events
 
 2. Console error: "Package ID not configured"
-   - Check `.env.local` has `NEXT_PUBLIC_PACKAGE_ID`
+   - Check `.env` has `NEXT_PUBLIC_CONTRACT_ID`
    - Restart dev server after adding env var
 
 3. Console error: "Error fetching my invoices"

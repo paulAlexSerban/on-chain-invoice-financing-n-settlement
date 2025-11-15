@@ -209,9 +209,9 @@ Ensure your contract fields match what the hook expects:
 - `created_at` (u64)
 
 ### 4. Verify Package ID
-Ensure `NEXT_PUBLIC_PACKAGE_ID` in `.env.local` matches your deployed contract:
+Ensure `NEXT_PUBLIC_CONTRACT_ID` in `.env` matches your deployed contract:
 ```bash
-NEXT_PUBLIC_PACKAGE_ID=0x4d3f0eeb160eaff90fafc34654457604bdce0ff38775f45f87561f5469aeac12
+NEXT_PUBLIC_CONTRACT_ID=0x4d3f0eeb160eaff90fafc34654457604bdce0ff38775f45f87561f5469aeac12
 ```
 
 ---

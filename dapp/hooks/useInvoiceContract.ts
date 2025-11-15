@@ -25,7 +25,7 @@ export function useInvoiceContract() {
   
   const [isLoading, setIsLoading] = useState(false);
 
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID || "";
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID || "";
   const factoryObjectId = process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID || "";
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
@@ -38,7 +38,7 @@ export function useInvoiceContract() {
   // Debug: Log environment variables on hook initialization
   if (typeof window !== 'undefined') {
     console.log("🔧 useInvoiceContract Environment Variables:");
-    console.log("  - NEXT_PUBLIC_PACKAGE_ID:", process.env.NEXT_PUBLIC_PACKAGE_ID || "NOT SET");
+    console.log("  - NEXT_PUBLIC_CONTRACT_ID:", process.env.NEXT_PUBLIC_CONTRACT_ID || "NOT SET");
     console.log("  - NEXT_PUBLIC_FACTORY_OBJECT_ID:", process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID || "NOT SET");
     console.log("  - Resolved packageId:", packageId || "EMPTY");
     console.log("  - Resolved factoryObjectId:", factoryObjectId || "EMPTY");
@@ -131,7 +131,7 @@ export function useInvoiceContract() {
 
     if (!packageId) {
       console.error("❌ Package ID not configured");
-      console.log("Current NEXT_PUBLIC_PACKAGE_ID:", process.env.NEXT_PUBLIC_PACKAGE_ID);
+      console.log("Current NEXT_PUBLIC_CONTRACT_ID:", process.env.NEXT_PUBLIC_CONTRACT_ID);
       toast({
         title: "Configuration Error",
         description: "Package ID not configured. Please deploy the contract first.",
@@ -145,11 +145,11 @@ export function useInvoiceContract() {
       console.error("❌ Factory Object ID not configured");
       console.error("  - process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID:", process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID);
       console.error("  - factoryObjectId variable:", factoryObjectId);
-      console.error("  - Please check dapp/.env.local file and ensure NEXT_PUBLIC_FACTORY_OBJECT_ID is set");
-      console.error("  - Restart the Next.js dev server after updating .env.local");
+      console.error("  - Please check dapp/.env file and ensure NEXT_PUBLIC_FACTORY_OBJECT_ID is set");
+      console.error("  - Restart the Next.js dev server after updating .env");
       toast({
         title: "Configuration Error",
-        description: `Factory Object ID not configured. Please set NEXT_PUBLIC_FACTORY_OBJECT_ID in dapp/.env.local and restart the dev server. Current value: ${process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID || "undefined"}`,
+        description: `Factory Object ID not configured. Please set NEXT_PUBLIC_FACTORY_OBJECT_ID in dapp/.env and restart the dev server. Current value: ${process.env.NEXT_PUBLIC_FACTORY_OBJECT_ID || "undefined"}`,
         variant: "destructive",
       });
       console.groupEnd();
