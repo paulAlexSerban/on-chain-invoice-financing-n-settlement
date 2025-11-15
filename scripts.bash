@@ -139,20 +139,32 @@ function publish_contract() {
 
   if [ -n "$FACTORY_OBJECT_ID" ]; then
     echo " [ SUCCESS ] Factory Object ID: $FACTORY_OBJECT_ID"
-    sed -i "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
-    echo "Add this to your dapp/.env.local file:"
-    echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      sed -i "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
+    fi
     echo ""
     echo "Add this to your dapp/.env.local file:"
     echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID"
     # Update frontend .env.local if it exists
     if [ -f "dapp/.env.local" ]; then
       if grep -q "^NEXT_PUBLIC_FACTORY_OBJECT_ID=" dapp/.env.local; then
-        sed -i "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          sed -i '' "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          sed -i "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
+        fi
       else
         echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID" >> dapp/.env.local
       fi
     fi
+  else
+    echo " [ WARNING ] Could not extract Factory Object ID from output"
+    echo " [ INFO ] You can find it manually with:"
+    echo "   sui client objects | grep -A 5 InvoiceFactory"
+    echo " Then add it to .env as:"
+    echo "   FACTORY_OBJECT_ID=0x..."
   fi
 }
 
@@ -186,6 +198,29 @@ function upgrade_contract() {
 
 function start_dev_server() {
   echo "Starting Next.js development server..."
+  
+  # Create or update dapp/.env.local with values from root .env
+  echo "Syncing environment variables to dapp/.env.local..."
+  
+  cat > ./dapp/.env.local << EOF
+# Auto-generated from root .env file
+# Last updated: $(date)
+
+# Package ID from contract deployment
+NEXT_PUBLIC_PACKAGE_ID=$PACKAGE_ID
+
+# Network configuration
+NEXT_PUBLIC_NETWORK=$SUI_NETWORK
+
+# Factory Object ID
+NEXT_PUBLIC_FACTORY_OBJECT_ID=${FACTORY_OBJECT_ID:-}
+
+# Active address
+NEXT_PUBLIC_ACTIVE_ADDRESS=$ACTIVE_ADDRESS
+EOF
+  
+  echo "✅ Environment variables synced to dapp/.env.local"
+  
   cd ./dapp || exit
   yarn dev
   cd .. || exit

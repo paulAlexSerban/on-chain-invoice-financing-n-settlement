@@ -235,7 +235,7 @@ export function useInvoiceContract() {
 
       console.log("✅ SupplierCap ID:", supplierCapId);
 
-      const moveCallTarget = `${packageId}::invoice_factory::issue_invoice`;
+      const moveCallTarget = `${packageId}::invoice_factory::issue_invoice` as `${string}::${string}::${string}`;
       console.log("🎯 Move Call Target:", moveCallTarget);
       console.log("📦 Factory Object ID:", factoryObjectId);
       console.log("🔑 SupplierCap ID:", supplierCapId);
