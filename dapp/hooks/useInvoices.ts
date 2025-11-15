@@ -501,3 +501,126 @@ export function useMyInvestments() {
     refetchInterval: 10000,
   });
 }
+
+// Hook to fetch invoices where the current user is the buyer (debtor)
+// These are invoices the user needs to settle/pay
+export function useMyPayableInvoices() {
+  const { currentAccount } = useWalletKit();
+  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+
+  const suiClient = new SuiClient({
+    url:
+      network === "mainnet"
+        ? "https://fullnode.mainnet.sui.io:443"
+        : "https://fullnode.testnet.sui.io:443",
+  });
+
+  const fetchMyPayableInvoices = async (): Promise<OnChainInvoice[]> => {
+    if (!currentAccount || !packageId) return [];
+
+    console.group("💳 Fetching My Payable Invoices (as Buyer/Debtor)");
+    console.log("Buyer Address:", currentAccount.address);
+
+    try {
+      // Get all InvoiceCreated events
+      const events = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::invoice_financing::InvoiceCreated`,
+        },
+        limit: 50,
+        order: "descending",
+      });
+
+      console.log("Total invoices found:", events.data.length);
+
+      // Extract invoice IDs
+      const invoiceIds = events.data
+        .map((event) => {
+          const parsedJson = event.parsedJson as any;
+          return parsedJson?.invoice_id;
+        })
+        .filter(Boolean);
+
+      // Fetch each invoice and filter by buyer
+      const invoiceObjects = await Promise.all(
+        invoiceIds.map(async (id) => {
+          try {
+            const obj = await suiClient.getObject({
+              id: id,
+              options: {
+                showContent: true,
+                showOwner: true,
+              },
+            });
+            return obj;
+          } catch (error) {
+            console.error(`Error fetching invoice ${id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Parse and filter invoices where current user is the buyer
+      const invoices = invoiceObjects
+        .filter(
+          (obj): obj is NonNullable<typeof obj> =>
+            obj !== null && obj.data?.content !== undefined
+        )
+        .map((obj) => {
+          const content = obj.data!.content as any;
+          const fields = content.fields;
+
+          const invoice: OnChainInvoice = {
+            id: obj.data!.objectId,
+            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
+            issuer: fields.issuer,
+            buyer: Buffer.from(fields.buyer).toString("utf-8"),
+            amount: fields.amount,
+            amountInSui: formatSuiAmount(fields.amount),
+            dueDate: parseInt(fields.due_date),
+            description: Buffer.from(fields.description).toString("utf-8"),
+            createdAt: parseInt(fields.created_at),
+            status: parseInt(fields.status),
+            financedBy: fields.financed_by,
+            investorPaid: fields.investor_paid,
+            investorPaidInSui: formatSuiAmount(fields.investor_paid || "0"),
+            supplierReceived: fields.supplier_received,
+            supplierReceivedInSui: formatSuiAmount(fields.supplier_received || "0"),
+            originationFeeCollected: fields.origination_fee_collected,
+            originationFeeCollectedInSui: formatSuiAmount(fields.origination_fee_collected || "0"),
+            discountRateBps: fields.discount_rate_bps,
+          };
+
+          return invoice;
+        })
+        .filter((invoice) => {
+          // Filter to only invoices where current user is the buyer
+          // Note: buyer field in contract is stored as vector<u8> (bytes)
+          // We compare the decoded buyer field with current address
+          return invoice.buyer === currentAccount.address;
+        });
+
+      console.log("My payable invoices:", invoices.length);
+      console.log("Status breakdown:", {
+        pending: invoices.filter(i => i.status === InvoiceStatus.PENDING).length,
+        funded: invoices.filter(i => i.status === InvoiceStatus.FUNDED).length,
+        repaid: invoices.filter(i => i.status === InvoiceStatus.REPAID).length,
+      });
+      console.groupEnd();
+
+      return invoices;
+    } catch (error) {
+      console.error("Error fetching payable invoices:", error);
+      console.groupEnd();
+      return [];
+    }
+  };
+
+  return useQuery({
+    queryKey: ["my-payable-invoices", currentAccount?.address, packageId],
+    queryFn: fetchMyPayableInvoices,
+    enabled: !!currentAccount && !!packageId,
+    refetchInterval: 10000,
+  });
+}

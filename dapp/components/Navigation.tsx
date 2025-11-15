@@ -57,6 +57,12 @@ const Navigation = () => {
             >
               For Investors
             </Link>
+            <Link
+              href="/dashboard/settle"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
+              Settle Invoices
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -121,6 +127,13 @@ const Navigation = () => {
               onClick={() => setMobileMenuOpen(false)}
             >
               For Investors
+            </Link>
+            <Link
+              href="/dashboard/settle"
+              className="block text-sm font-medium hover:text-primary transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Settle Invoices
             </Link>
             <div className="flex gap-2">
               <Button
