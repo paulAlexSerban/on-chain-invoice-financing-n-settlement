@@ -9,6 +9,7 @@ import InvestmentList from "@/components/InvestmentList";
 import PortfolioDistribution from "@/components/PortfolioDistribution";
 import PerformanceMetrics from "@/components/PerformanceMetrics";
 import { Investment } from "@/components/InvestmentCard";
+import { SettleInvoiceModal } from "@/components/SettleInvoiceModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMyInvestments } from "@/hooks/useInvoices";
 import { OnChainInvoice, InvoiceStatus, formatDate } from "@/types/invoice";
@@ -19,8 +20,10 @@ import { Button } from "@/components/ui/button";
 
 const InvestorDashboard = () => {
   const { currentAccount } = useWalletKit();
-  const { data: investments, isLoading, error } = useMyInvestments();
+  const { data: investments, isLoading, error, refetch } = useMyInvestments();
   const [kycStatus, setKycStatus] = useState<'approved' | 'pending' | 'rejected' | 'loading'>('loading');
+  const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<OnChainInvoice | null>(null);
 
   // Fetch KYC status when wallet connects
   useEffect(() => {
@@ -100,6 +103,21 @@ const InvestorDashboard = () => {
       ? `https://suivision.xyz/object/${investment.id}`
       : `https://testnet.suivision.xyz/object/${investment.id}`;
     window.open(url, '_blank');
+  };
+
+  const handleSettleClick = (investment: Investment) => {
+    // Find the full OnChainInvoice data
+    const invoice = investments?.find(inv => inv.id === investment.id);
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setSettleModalOpen(true);
+    }
+  };
+
+  const handleSettleSuccess = () => {
+    // Refetch investments to update the list
+    refetch();
+    console.log("Invoice settled successfully!");
   };
 
   // Show wallet connection prompt if no wallet
@@ -197,6 +215,8 @@ const InvestorDashboard = () => {
                   investments={activeInvestments}
                   emptyMessage="No active investments found. Visit the marketplace to finance invoices!"
                   onInvestmentClick={handleInvestmentClick}
+                  onSettle={handleSettleClick}
+                  showSettleButton={true}
                 />
               </TabsContent>
 
@@ -205,6 +225,7 @@ const InvestorDashboard = () => {
                   investments={settledInvestments}
                   emptyMessage="No settled investments yet."
                   onInvestmentClick={handleInvestmentClick}
+                  showSettleButton={false}
                 />
               </TabsContent>
 
@@ -215,6 +236,21 @@ const InvestorDashboard = () => {
                 </div>
               </TabsContent>
             </Tabs>
+          )}
+
+          {/* Settlement Modal */}
+          {selectedInvoice && (
+            <SettleInvoiceModal
+              open={settleModalOpen}
+              onOpenChange={setSettleModalOpen}
+              invoice={{
+                id: selectedInvoice.id,
+                invoiceNumber: selectedInvoice.invoiceNumber,
+                amount: selectedInvoice.amountInSui,
+                dueDate: formatDate(selectedInvoice.dueDate),
+              }}
+              onSuccess={handleSettleSuccess}
+            />
           )}
         </div>
       </div>

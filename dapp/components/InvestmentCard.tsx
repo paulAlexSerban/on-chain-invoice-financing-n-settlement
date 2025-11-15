@@ -1,5 +1,7 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 
 export interface Investment {
   id: string;
@@ -18,9 +20,11 @@ export interface Investment {
 interface InvestmentCardProps {
   investment: Investment;
   onClick?: (investment: Investment) => void;
+  onSettle?: (investment: Investment) => void;
+  showSettleButton?: boolean;
 }
 
-const InvestmentCard = ({ investment, onClick }: InvestmentCardProps) => {
+const InvestmentCard = ({ investment, onClick, onSettle, showSettleButton = false }: InvestmentCardProps) => {
   const getStatusBadge = () => {
     if (investment.status === "settled") {
       return <Badge variant="secondary">Settled</Badge>;
@@ -30,8 +34,17 @@ const InvestmentCard = ({ investment, onClick }: InvestmentCardProps) => {
 
   const isSettled = investment.status === "settled";
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger card click if clicking on a button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    onClick?.(investment);
+  };
+
   return (
-    <Card className="cursor-pointer hover:border-primary transition-colors" onClick={() => onClick?.(investment)}>
+    <Card className="hover:border-primary transition-colors">
+      <div className="cursor-pointer" onClick={handleCardClick}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -79,6 +92,34 @@ const InvestmentCard = ({ investment, onClick }: InvestmentCardProps) => {
           </div>
         </div>
       </CardContent>
+      </div>
+      
+      {showSettleButton && !isSettled && (
+        <CardFooter className="border-t pt-4 flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.(investment);
+            }}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            View Details
+          </Button>
+          <Button 
+            size="sm"
+            className="flex-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSettle?.(investment);
+            }}
+          >
+            Settle {investment.expectedReturn?.toFixed(2)} SUI
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 };

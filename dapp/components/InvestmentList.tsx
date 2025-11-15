@@ -4,12 +4,16 @@ interface InvestmentListProps {
   investments: Investment[];
   emptyMessage?: string;
   onInvestmentClick?: (investment: Investment) => void;
+  onSettle?: (investment: Investment) => void;
+  showSettleButton?: boolean;
 }
 
 const InvestmentList = ({
   investments,
   emptyMessage = "No investments found",
   onInvestmentClick,
+  onSettle,
+  showSettleButton = false,
 }: InvestmentListProps) => {
   if (investments.length === 0) {
     return (
@@ -26,6 +30,8 @@ const InvestmentList = ({
           key={investment.id}
           investment={investment}
           onClick={onInvestmentClick}
+          onSettle={onSettle}
+          showSettleButton={showSettleButton}
         />
       ))}
     </div>

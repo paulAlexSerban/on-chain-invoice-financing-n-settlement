@@ -14,12 +14,27 @@ public struct Platform has key {
     admin: address,
     /// Treasury to collect fees
     treasury: address,
+    /// Oracle address authorized to confirm payments
+    oracle: address,
     /// Origination fee in basis points (1% = 100 bps, max 2% = 200 bps)
     origination_fee_bps: u64,
     /// Take-rate on financier discount in basis points (10% = 1000 bps, max 20% = 2000 bps)
     take_rate_bps: u64,
     /// Settlement fee in MIST (flat fee)
     settlement_fee: u64,
+}
+
+/// Escrow holding buyer payment until settlement
+public struct SettlementEscrow has key {
+    id: UID,
+    /// Invoice this escrow is for
+    invoice_id: ID,
+    /// Payment amount held
+    amount: u64,
+    /// Who deposited (oracle)
+    depositor: address,
+    /// When deposited
+    created_at: u64,
 }
 
 /// Main invoice object
@@ -95,6 +110,19 @@ public struct FeesCollected has copy, drop {
     total_fees: u64,
 }
 
+public struct PaymentDeposited has copy, drop {
+    invoice_id: ID,
+    escrow_id: ID,
+    amount: u64,
+    depositor: address,
+}
+
+public struct PaymentConfirmed has copy, drop {
+    invoice_id: ID,
+    investor_received: u64,
+    platform_fees: u64,
+}
+
 // ===== Errors =====
 
 const EInvalidAmount: u64 = 0;
@@ -125,10 +153,12 @@ const MAX_DISCOUNT_RATE_BPS: u64 = 5000;
 fun init(ctx: &mut TxContext) {
     // Create platform configuration with default fees
     // Default: 1% origination (100 bps), 10% take-rate (1000 bps), 0.01 SUI settlement fee
+    // Oracle initially set to admin (can be updated later)
     let platform = Platform {
         id: object::new(ctx),
         admin: tx_context::sender(ctx),
         treasury: tx_context::sender(ctx),
+        oracle: tx_context::sender(ctx), // Initially admin is oracle
         origination_fee_bps: 100,  // 1%
         take_rate_bps: 1000,        // 10%
         settlement_fee: 10_000_000, // 0.01 SUI in MIST
@@ -351,6 +381,168 @@ public fun repay_invoice(
     transfer::public_transfer(investor_coin, investor);
 }
 
+/// Oracle deposits payment into escrow (Step 1 of oracle settlement)
+///
+/// # Arguments
+/// * `platform` - Platform configuration (verifies oracle)
+/// * `invoice` - Invoice being paid
+/// * `payment` - Payment from buyer (via oracle)
+/// * `clock` - Sui clock for timestamp
+///
+/// # Oracle Flow
+/// 1. Oracle detects off-chain payment (bank transfer, etc.)
+/// 2. Oracle calls this function to deposit equivalent on-chain funds
+/// 3. Creates SettlementEscrow holding the payment
+/// 4. Later oracle calls confirm_payment_oracle to complete settlement
+public fun deposit_payment_oracle(
+    platform: &Platform,
+    invoice: &Invoice,
+    payment: Coin<SUI>,
+    clock: &Clock,
+    ctx: &mut TxContext
+) {
+    // Only oracle can deposit
+    assert!(tx_context::sender(ctx) == platform.oracle, ENotAuthorized);
+    
+    // Invoice must be funded
+    assert!(invoice.status == STATUS_FUNDED, EInvoiceNotFunded);
+    
+    // Payment must cover invoice amount
+    let payment_amount = coin::value(&payment);
+    assert!(payment_amount >= invoice.amount, EInsufficientPayment);
+    
+    // Create escrow
+    let escrow = SettlementEscrow {
+        id: object::new(ctx),
+        invoice_id: object::uid_to_inner(&invoice.id),
+        amount: payment_amount,
+        depositor: tx_context::sender(ctx),
+        created_at: clock::timestamp_ms(clock),
+    };
+    
+    let escrow_id = object::id(&escrow);
+    
+    // Emit event
+    event::emit(PaymentDeposited {
+        invoice_id: object::uid_to_inner(&invoice.id),
+        escrow_id,
+        amount: payment_amount,
+        depositor: platform.oracle,
+    });
+    
+    // Transfer payment to escrow
+    transfer::public_transfer(payment, object::id_to_address(&escrow_id));
+    
+    // Transfer escrow to oracle (temporary custody)
+    transfer::transfer(escrow, platform.oracle);
+}
+
+/// Oracle confirms payment and settles invoice (Step 2 of oracle settlement)
+///
+/// # Arguments
+/// * `platform` - Platform configuration
+/// * `invoice` - Invoice to settle
+/// * `escrow` - Escrow containing payment
+/// * `payment` - Payment coin from escrow
+///
+/// # Settlement Flow
+/// 1. Verify oracle authority
+/// 2. Calculate platform fees
+/// 3. Distribute payment: fees to treasury, net to investor
+/// 4. Mark invoice as REPAID
+/// 5. Destroy escrow
+public fun confirm_payment_oracle(
+    platform: &Platform,
+    invoice: &mut Invoice,
+    escrow: SettlementEscrow,
+    mut payment: Coin<SUI>,
+    ctx: &mut TxContext
+) {
+    // Only oracle can confirm
+    assert!(tx_context::sender(ctx) == platform.oracle, ENotAuthorized);
+    
+    // Invoice must be funded
+    assert!(invoice.status == STATUS_FUNDED, EInvoiceNotFunded);
+    
+    // Verify escrow matches invoice
+    let SettlementEscrow { 
+        id, 
+        invoice_id, 
+        amount: escrow_amount, 
+        depositor: _depositor, 
+        created_at: _created_at 
+    } = escrow;
+    
+    assert!(invoice_id == object::uid_to_inner(&invoice.id), ENotAuthorized);
+    
+    object::delete(id);
+    
+    // Calculate fees (same as repay_invoice)
+    let discount_amount = (invoice.amount * invoice.discount_rate_bps) / BPS_DENOMINATOR;
+    let take_rate_fee = (discount_amount * platform.take_rate_bps) / BPS_DENOMINATOR;
+    let settlement_fee = platform.settlement_fee;
+    let total_platform_fees = take_rate_fee + settlement_fee;
+    
+    // Split payment
+    let payment_amount = coin::value(&payment);
+    let investor_amount = if (payment_amount >= total_platform_fees) {
+        payment_amount - total_platform_fees
+    } else {
+        0 // Edge case: insufficient funds
+    };
+    
+    let platform_fees_coin = if (total_platform_fees > 0 && payment_amount >= total_platform_fees) {
+        coin::split(&mut payment, total_platform_fees, ctx)
+    } else {
+        coin::zero<SUI>(ctx)
+    };
+    
+    // Determine how to split payment
+    let (investor_coin, remainder) = if (investor_amount > 0 && investor_amount <= payment_amount) {
+        let inv_coin = coin::split(&mut payment, investor_amount, ctx);
+        (inv_coin, payment)
+    } else {
+        // Edge case: give all remaining to investor
+        (payment, coin::zero<SUI>(ctx))
+    };
+    
+    // Update status
+    invoice.status = STATUS_REPAID;
+    
+    // Emit events
+    event::emit(PaymentConfirmed {
+        invoice_id: object::uid_to_inner(&invoice.id),
+        investor_received: coin::value(&investor_coin),
+        platform_fees: total_platform_fees,
+    });
+    
+    event::emit(InvoiceRepaid {
+        invoice_id: object::uid_to_inner(&invoice.id),
+        amount_paid: escrow_amount,
+        investor_received: coin::value(&investor_coin),
+        platform_take_rate_fee: take_rate_fee,
+        settlement_fee,
+    });
+    
+    // Transfer platform fees
+    if (coin::value(&platform_fees_coin) > 0) {
+        transfer::public_transfer(platform_fees_coin, platform.treasury);
+    } else {
+        coin::destroy_zero(platform_fees_coin);
+    };
+    
+    // Transfer to investor
+    let investor = *option::borrow(&invoice.financed_by);
+    transfer::public_transfer(investor_coin, investor);
+    
+    // Destroy or transfer remainder
+    if (coin::value(&remainder) > 0) {
+        transfer::public_transfer(remainder, platform.treasury);
+    } else {
+        coin::destroy_zero(remainder);
+    };
+}
+
 // ===== View Functions =====
 
 public fun get_amount(invoice: &Invoice): u64 {
@@ -441,6 +633,16 @@ public fun update_treasury(
 ) {
     assert!(tx_context::sender(ctx) == platform.admin, ENotAuthorized);
     platform.treasury = new_treasury;
+}
+
+/// Update oracle address (admin only)
+public fun update_oracle(
+    platform: &mut Platform,
+    new_oracle: address,
+    ctx: &TxContext
+) {
+    assert!(tx_context::sender(ctx) == platform.admin, ENotAuthorized);
+    platform.oracle = new_oracle;
 }
 
 /// Transfer admin rights (admin only)
