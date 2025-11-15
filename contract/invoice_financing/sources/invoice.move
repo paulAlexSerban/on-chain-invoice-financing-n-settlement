@@ -52,6 +52,30 @@ public fun status(invoice: &Invoice): u8 {
     invoice.status
 }
 
+public fun fee_bps(invoice: &Invoice): u64 {
+    invoice.fee_bps
+}
+
+public fun escrow_bps(invoice: &Invoice): u64 {
+    invoice.escrow_bps
+}
+
+public fun investor(invoice: &Invoice): Option<address> {
+    invoice.investor
+}
+
+public fun investor_paid(invoice: &Invoice): Option<u64> {
+    invoice.investor_paid
+}
+
+public fun supplier_received(invoice: &Invoice): Option<u64> {
+    invoice.supplier_received
+}
+
+public fun origination_fee(invoice: &Invoice): Option<u64> {
+    invoice.origination_fee
+}
+
 // SETTERS
 
 public(package) fun set_status(invoice: &mut Invoice, new_status: u8) {
