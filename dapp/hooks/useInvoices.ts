@@ -95,20 +95,55 @@ export function useInvoices(filters?: InvoiceFilters) {
           const content = obj.data!.content as any;
           const fields = content.fields;
 
+          // Helper to extract Option<T> values (Move Option is represented as {vec: [value]} or {vec: []})
+          const extractOption = (optionField: any) => {
+            if (!optionField || !optionField.vec) return undefined;
+            return optionField.vec.length > 0 ? optionField.vec[0] : undefined;
+          };
+
+          const investor = extractOption(fields.investor);
+          const investorPaid = extractOption(fields.investor_paid);
+          const supplierReceived = extractOption(fields.supplier_received);
+          const originationFee = extractOption(fields.origination_fee);
+
+          // Parse companies_info (JSON string containing invoice number and description)
+          let companiesInfoStr = "";
+          let companiesInfo: any = {};
+
+          if (fields.companies_info) {
+            try {
+              companiesInfoStr = Buffer.from(fields.companies_info).toString("utf-8");
+              companiesInfo = JSON.parse(companiesInfoStr);
+            } catch (e) {
+              console.warn("Failed to parse companies_info:", e);
+              companiesInfoStr = "";
+            }
+          }
+
           const invoice: OnChainInvoice = {
             id: obj.data!.objectId,
-            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
-            issuer: fields.issuer,
-            buyer: Buffer.from(fields.buyer).toString("utf-8"),
-            amount: fields.amount,
-            amountInSui: formatSuiAmount(fields.amount),
-            dueDate: parseInt(fields.due_date),
-            description: Buffer.from(fields.description).toString("utf-8"),
-            createdAt: parseInt(fields.created_at),
-            status: parseInt(fields.status),
-            financedBy: fields.financed_by ? fields.financed_by : undefined,
-            financedAmount: fields.financed_amount || "0",
-            financedAmountInSui: formatSuiAmount(fields.financed_amount || "0"),
+            invoiceNumber: companiesInfo.invoiceNumber || "N/A",
+            issuer: fields.supplier || "",
+            buyer: fields.buyer || "", // buyer is an address, not bytes
+            amount: fields.amount?.toString() || "0",
+            amountInSui: fields.amount ? formatSuiAmount(fields.amount) : 0,
+            dueDate: fields.due_date ? parseInt(fields.due_date) * 1000 : Date.now(), // Convert seconds to ms
+            description: companiesInfo.description || companiesInfoStr,
+            createdAt: Date.now(), // TODO: Add created_at to Invoice struct
+            status: fields.status !== undefined ? parseInt(fields.status) : 0,
+            financedBy: investor,
+            investorPaid: investorPaid,
+            investorPaidInSui: investorPaid ? formatSuiAmount(investorPaid) : undefined,
+            supplierReceived: supplierReceived,
+            supplierReceivedInSui: supplierReceived ? formatSuiAmount(supplierReceived) : undefined,
+            originationFeeCollected: originationFee,
+            originationFeeCollectedInSui: originationFee ? formatSuiAmount(originationFee) : undefined,
+            discountRateBps: fields.discount_bps?.toString() || "0",
+            escrowBps: fields.escrow_bps !== undefined ? parseInt(fields.escrow_bps) : 0,
+            discountBps: fields.discount_bps !== undefined ? parseInt(fields.discount_bps) : 0,
+            feeBps: fields.fee_bps !== undefined ? parseInt(fields.fee_bps) : 0,
+            companiesInfo: companiesInfoStr,
+            supplier: fields.supplier || "",
           };
 
           return invoice;
@@ -121,14 +156,15 @@ export function useInvoices(filters?: InvoiceFilters) {
       let filteredInvoices = invoices;
 
       if (filters?.status && filters.status !== "all") {
-        const statusMap = {
-          pending: InvoiceStatus.PENDING,
-          funded: InvoiceStatus.FUNDED,
-          repaid: InvoiceStatus.REPAID,
+        const statusMap: Record<string, number> = {
+          created: InvoiceStatus.CREATED,
+          ready: InvoiceStatus.READY,
+          funded: InvoiceStatus.FINANCED,
+          paid: InvoiceStatus.PAID,
         };
         filteredInvoices = filteredInvoices.filter(
           (inv) =>
-            inv.status === statusMap[filters.status as keyof typeof statusMap]
+            inv.status === statusMap[filters.status as string]
         );
       }
 
@@ -328,28 +364,54 @@ export function useMyInvoices() {
           const content = obj!.data!.content as any;
           const fields = content.fields;
 
-          const invoice: OnChainInvoice = {
-            id: obj!.data!.objectId,
-            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
-            issuer: fields.issuer,
-            buyer: Buffer.from(fields.buyer).toString("utf-8"),
-            amount: fields.amount,
-            amountInSui: formatSuiAmount(fields.amount),
-            dueDate: parseInt(fields.due_date),
-            description: Buffer.from(fields.description).toString("utf-8"),
-            createdAt: parseInt(fields.created_at),
-            status: parseInt(fields.status),
-            financedBy: fields.financed_by ? fields.financed_by : undefined,
-            financedAmount: fields.financed_amount || "0",
-            financedAmountInSui: formatSuiAmount(fields.financed_amount || "0"),
-            // New fields from updated contract
-            investorPaid: fields.investor_paid,
-            investorPaidInSui: fields.investor_paid ? formatSuiAmount(fields.investor_paid) : undefined,
-            supplierReceived: fields.supplier_received,
-            supplierReceivedInSui: fields.supplier_received ? formatSuiAmount(fields.supplier_received) : undefined,
-            originationFeeCollected: fields.origination_fee_collected,
-            originationFeeCollectedInSui: fields.origination_fee_collected ? formatSuiAmount(fields.origination_fee_collected) : undefined,
-            discountRateBps: fields.discount_rate_bps,
+          // Helper to extract Option<T> values
+          const extractOption = (optionField: any) => {
+            if (!optionField || !optionField.vec) return undefined;
+            return optionField.vec.length > 0 ? optionField.vec[0] : undefined;
+          };
+
+          const investor = extractOption(fields.investor);
+          const investorPaid = extractOption(fields.investor_paid);
+          const supplierReceived = extractOption(fields.supplier_received);
+          const originationFee = extractOption(fields.origination_fee);
+
+          // Parse companies_info
+          let companiesInfoStr = "";
+          let companiesInfo: any = {};
+
+          if (fields.companies_info) {
+            try {
+              companiesInfoStr = Buffer.from(fields.companies_info).toString("utf-8");
+              companiesInfo = JSON.parse(companiesInfoStr);
+            } catch (e) {
+              console.warn("Failed to parse companies_info:", e);
+            }
+          }
+
+          return {
+            id: obj.data!.objectId,
+            invoiceNumber: companiesInfo.invoiceNumber || "N/A",
+            issuer: fields.supplier || "",
+            buyer: fields.buyer || "",
+            amount: fields.amount?.toString() || "0",
+            amountInSui: fields.amount ? formatSuiAmount(fields.amount) : 0,
+            dueDate: fields.due_date ? parseInt(fields.due_date) * 1000 : Date.now(),
+            description: companiesInfo.description || companiesInfoStr,
+            createdAt: Date.now(), // TODO: Add created_at field to Invoice struct
+            status: fields.status !== undefined ? parseInt(fields.status) : 0,
+            financedBy: investor,
+            investorPaid: investorPaid,
+            investorPaidInSui: investorPaid ? formatSuiAmount(investorPaid) : undefined,
+            supplierReceived: supplierReceived,
+            supplierReceivedInSui: supplierReceived ? formatSuiAmount(supplierReceived) : undefined,
+            originationFeeCollected: originationFee,
+            originationFeeCollectedInSui: originationFee ? formatSuiAmount(originationFee) : undefined,
+            discountRateBps: fields.discount_bps?.toString() || "0",
+            escrowBps: fields.escrow_bps !== undefined ? parseInt(fields.escrow_bps) : 0,
+            discountBps: fields.discount_bps !== undefined ? parseInt(fields.discount_bps) : 0,
+            feeBps: fields.fee_bps !== undefined ? parseInt(fields.fee_bps) : 0,
+            companiesInfo: companiesInfoStr,
+            supplier: fields.supplier || "",
           };
 
           return invoice;
@@ -459,25 +521,54 @@ export function useMyInvestments() {
           const content = obj.data!.content as any;
           const fields = content.fields;
 
+          // Helper to extract Option<T> values
+          const extractOption = (optionField: any) => {
+            if (!optionField || !optionField.vec) return undefined;
+            return optionField.vec.length > 0 ? optionField.vec[0] : undefined;
+          };
+
+          const investor = extractOption(fields.investor);
+          const investorPaid = extractOption(fields.investor_paid);
+          const supplierReceived = extractOption(fields.supplier_received);
+          const originationFee = extractOption(fields.origination_fee);
+
+          // Parse companies_info
+          let companiesInfoStr = "";
+          let companiesInfo: any = {};
+
+          if (fields.companies_info) {
+            try {
+              companiesInfoStr = Buffer.from(fields.companies_info).toString("utf-8");
+              companiesInfo = JSON.parse(companiesInfoStr);
+            } catch (e) {
+              console.warn("Failed to parse companies_info:", e);
+            }
+          }
+
           const invoice: OnChainInvoice = {
             id: obj.data!.objectId,
-            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
-            issuer: fields.issuer,
-            buyer: Buffer.from(fields.buyer).toString("utf-8"),
-            amount: fields.amount,
-            amountInSui: formatSuiAmount(fields.amount),
-            dueDate: parseInt(fields.due_date),
-            description: Buffer.from(fields.description).toString("utf-8"),
-            createdAt: parseInt(fields.created_at),
-            status: parseInt(fields.status),
-            financedBy: fields.financed_by,
-            investorPaid: fields.investor_paid,
-            investorPaidInSui: formatSuiAmount(fields.investor_paid || "0"),
-            supplierReceived: fields.supplier_received,
-            supplierReceivedInSui: formatSuiAmount(fields.supplier_received || "0"),
-            originationFeeCollected: fields.origination_fee_collected,
-            originationFeeCollectedInSui: formatSuiAmount(fields.origination_fee_collected || "0"),
-            discountRateBps: fields.discount_rate_bps,
+            invoiceNumber: companiesInfo.invoiceNumber || "N/A",
+            issuer: fields.supplier || "",
+            buyer: fields.buyer || "",
+            amount: fields.amount?.toString() || "0",
+            amountInSui: fields.amount ? formatSuiAmount(fields.amount) : 0,
+            dueDate: fields.due_date ? parseInt(fields.due_date) * 1000 : Date.now(),
+            description: companiesInfo.description || companiesInfoStr,
+            createdAt: Date.now(), // TODO: Add created_at field
+            status: fields.status !== undefined ? parseInt(fields.status) : 0,
+            financedBy: investor,
+            investorPaid: investorPaid,
+            investorPaidInSui: investorPaid ? formatSuiAmount(investorPaid) : undefined,
+            supplierReceived: supplierReceived,
+            supplierReceivedInSui: supplierReceived ? formatSuiAmount(supplierReceived) : undefined,
+            originationFeeCollected: originationFee,
+            originationFeeCollectedInSui: originationFee ? formatSuiAmount(originationFee) : undefined,
+            discountRateBps: fields.discount_bps?.toString() || "0",
+            escrowBps: fields.escrow_bps !== undefined ? parseInt(fields.escrow_bps) : 0,
+            discountBps: fields.discount_bps !== undefined ? parseInt(fields.discount_bps) : 0,
+            feeBps: fields.fee_bps !== undefined ? parseInt(fields.fee_bps) : 0,
+            companiesInfo: companiesInfoStr,
+            supplier: fields.supplier || "",
           };
 
           return invoice;

@@ -107,8 +107,10 @@ function publish_contract() {
   
   local PACKAGE_ID=$(echo "$OUTPUT" | grep -oE 'PackageID: 0x[a-f0-9]+' | awk '{print $2}')
   local UPGRADE_CAP_ID=$(echo "$OUTPUT" | grep -A 20 "UpgradeCap" | grep -oE '│ ObjectID: 0x[a-f0-9]+' | head -1 | awk '{print $3}')
+  local FACTORY_OBJECT_ID=$(echo "$OUTPUT" | grep -B 3 "invoice_factory::InvoiceFactory" | grep -oE 'ObjectID: 0x[a-f0-9]+' | head -1 | awk '{print $2}')
   echo "Extracted PACKAGE_ID: $PACKAGE_ID"
   echo "Extracted UPGRADE_CAP_ID: $UPGRADE_CAP_ID"
+  echo "Extracted FACTORY_OBJECT_ID: $FACTORY_OBJECT_ID"
   if [ -n "$PACKAGE_ID" ]; then
     echo ""
     echo " [ SUCCESS ] Published package with ID: $PACKAGE_ID"
@@ -132,6 +134,24 @@ function publish_contract() {
       sed -i '' "s/^UPGRADE_CAP_ID=.*/UPGRADE_CAP_ID=$UPGRADE_CAP_ID/" "$ENV_FILE"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
       sed -i "s/^UPGRADE_CAP_ID=.*/UPGRADE_CAP_ID=$UPGRADE_CAP_ID/" "$ENV_FILE"
+    fi
+  fi
+
+  if [ -n "$FACTORY_OBJECT_ID" ]; then
+    echo " [ SUCCESS ] Factory Object ID: $FACTORY_OBJECT_ID"
+    sed -i "s/^FACTORY_OBJECT_ID=.*/FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID/" "$ENV_FILE"
+    echo "Add this to your dapp/.env.local file:"
+    echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID"
+    echo ""
+    echo "Add this to your dapp/.env.local file:"
+    echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID"
+    # Update frontend .env.local if it exists
+    if [ -f "dapp/.env.local" ]; then
+      if grep -q "^NEXT_PUBLIC_FACTORY_OBJECT_ID=" dapp/.env.local; then
+        sed -i "s|^NEXT_PUBLIC_FACTORY_OBJECT_ID=.*|NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID|" dapp/.env.local
+      else
+        echo "NEXT_PUBLIC_FACTORY_OBJECT_ID=$FACTORY_OBJECT_ID" >> dapp/.env.local
+      fi
     fi
   fi
 }

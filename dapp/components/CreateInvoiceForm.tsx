@@ -11,8 +11,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useInvoiceContract } from "@/hooks/useInvoiceContract";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useSupplierRegistration } from "@/hooks/useSupplierRegistration";
+import { Loader2, UserPlus } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface CreateInvoiceFormProps {
   onSuccess?: (invoiceId: string) => void;
@@ -29,7 +30,22 @@ export interface InvoiceFormData {
 
 const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
   const { createInvoice, isLoading, isConnected } = useInvoiceContract();
+  const { registerSupplier, getSupplierCapId, isLoading: isRegistering } = useSupplierRegistration();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSupplierCap, setHasSupplierCap] = useState(false);
+
+  useEffect(() => {
+    // Check if user has SupplierCap
+    const checkCap = async () => {
+      const capId = await getSupplierCapId();
+      setHasSupplierCap(!!capId);
+    };
+    checkCap();
+
+    // Also check when supplier registers
+    const interval = setInterval(checkCap, 3000); // Check every 3 seconds
+    return () => clearInterval(interval);
+  }, [getSupplierCapId, isRegistering]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,12 +67,58 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
     const form = e.currentTarget;
     const formData = new FormData(form);
     
+    // Validate required fields
+    // Check both "buyer" and "client" field names for backward compatibility
+    const buyerAddress = (formData.get("buyer") || formData.get("client")) as string | null;
+    const invoiceNumber = formData.get("invoiceId") as string | null;
+    const amount = formData.get("amount") as string | null;
+    const dueDate = formData.get("dueDate") as string | null;
+    
+    console.log("🔍 Form field values:");
+    console.log("  - buyer field:", formData.get("buyer"));
+    console.log("  - client field:", formData.get("client"));
+    console.log("  - buyerAddress:", buyerAddress);
+    
+    if (!buyerAddress || !buyerAddress.trim()) {
+      alert("Please enter a buyer address");
+      console.error("❌ Buyer address is required");
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (!invoiceNumber || !invoiceNumber.trim()) {
+      alert("Please enter an invoice ID");
+      console.error("❌ Invoice ID is required");
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      alert("Please enter a valid amount (greater than 0)");
+      console.error("❌ Invalid amount");
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (!dueDate) {
+      alert("Please select a due date");
+      console.error("❌ Due date is required");
+      setIsSubmitting(false);
+      return;
+    }
+    
     const invoiceData = {
-      invoiceNumber: formData.get("invoiceId") as string,
-      buyer: formData.get("client") as string,
-      amount: Number(formData.get("amount")),
-      dueDate: new Date(formData.get("dueDate") as string),
-      description: formData.get("description") as string || "",
+      invoiceNumber: invoiceNumber.trim(),
+      buyerAddress: buyerAddress.trim(),
+      amount: Number(amount),
+      dueDate: new Date(dueDate),
+      companiesInfo: JSON.stringify({
+        invoiceNumber: invoiceNumber.trim(),
+        description: (formData.get("description") as string || "").trim(),
+      }),
+      discountBps: 500, // 5% default
+      feeBps: 100, // 1% default
+      escrowBps: 1000, // 10% default
     };
 
     console.log("📋 Form Data Collected:", invoiceData);
@@ -110,23 +172,32 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="client">Client Name</Label>
+              <Label htmlFor="buyer">Buyer Address</Label>
               <Input
-                id="client"
-                name="client"
-                placeholder="e.g., TechStart Inc."
+                id="buyer"
+                name="buyer"
+                placeholder="0x... (Sui address)"
                 required
+                pattern="^0x[a-fA-F0-9]{64}$"
+                title="Enter a valid Sui address (0x followed by 64 hex characters)"
               />
+              <p className="text-xs text-muted-foreground">
+                Enter the Sui address of the buyer who will repay the invoice
+              </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="amount">Invoice Amount ($)</Label>
+              <Label htmlFor="amount">Invoice Amount (SUI)</Label>
               <Input
                 id="amount"
                 name="amount"
                 type="number"
-                placeholder="50000"
+                step="0.0001"
+                placeholder="100"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Amount in SUI (not USD)
+              </p>
             </div>
           </div>
 
@@ -170,24 +241,53 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="document">Invoice Document (Optional)</Label>
-            <Input
-              id="document"
-              name="document"
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg"
-              className="cursor-pointer"
-            />
-            <p className="text-sm text-muted-foreground">
-              Upload invoice PDF or image. Document hash will be stored on-chain for verification.
-            </p>
-          </div>
+          {!hasSupplierCap && isConnected && (
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-md mb-4">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
+                ⚠️ You need to register as a supplier before creating invoices.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  console.log("🚀 Starting supplier registration...");
+                  const result = await registerSupplier();
+                  console.log("📥 Registration result:", result);
+                  if (result?.success) {
+                    console.log("✅ Registration successful, setting hasSupplierCap to true");
+                    setHasSupplierCap(true);
+
+                    // Also trigger a re-check
+                    const capId = await getSupplierCapId();
+                    if (capId) {
+                      setHasSupplierCap(true);
+                    }
+                  } else {
+                    console.warn("⚠️ Registration result:", result);
+                  }
+                }}
+                disabled={isRegistering}
+                className="w-full"
+              >
+                {isRegistering ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registering...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Register as Supplier
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
 
           <Button 
             type="submit" 
             className="w-full"
-            disabled={!isConnected || isSubmitting || isLoading}
+            disabled={!isConnected || !hasSupplierCap || isSubmitting || isLoading}
           >
             {isSubmitting || isLoading ? (
               <>
@@ -196,6 +296,8 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
               </>
             ) : !isConnected ? (
               "Connect Wallet First"
+            ) : !hasSupplierCap ? (
+              "Register as Supplier First"
             ) : (
               "Tokenize Invoice"
             )}

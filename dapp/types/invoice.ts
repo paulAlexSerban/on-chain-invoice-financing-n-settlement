@@ -23,7 +23,7 @@ export interface OnChainInvoice {
 }
 
 export interface InvoiceFilters {
-  status?: 'all' | 'pending' | 'funded' | 'repaid';
+  status?: 'all' | 'created' | 'ready' | 'funded' | 'paid';
   minAmount?: number;
   maxAmount?: number;
   sortBy?: 'amount' | 'dueDate' | 'createdAt';
@@ -31,22 +31,22 @@ export interface InvoiceFilters {
 }
 
 export const InvoiceStatus = {
-  PENDING: 0,
-  FUNDED: 1,
-  REPAID: 2,
-  DEFAULTED: 3,
+  CREATED: 0,  // Created (not ready)
+  READY: 1,    // Ready for financing
+  FINANCED: 2, // Financed
+  PAID: 3,     // Paid/Repaid
 } as const;
 
 export const getStatusLabel = (status: number): string => {
   switch (status) {
-    case InvoiceStatus.PENDING:
+    case InvoiceStatus.CREATED:
+      return 'Created';
+    case InvoiceStatus.READY:
       return 'Available';
-    case InvoiceStatus.FUNDED:
+    case InvoiceStatus.FINANCED:
       return 'Funded';
-    case InvoiceStatus.REPAID:
-      return 'Repaid';
-    case InvoiceStatus.DEFAULTED:
-      return 'Defaulted';
+    case InvoiceStatus.PAID:
+      return 'Paid';
     default:
       return 'Unknown';
   }
@@ -54,14 +54,14 @@ export const getStatusLabel = (status: number): string => {
 
 export const getStatusColor = (status: number): string => {
   switch (status) {
-    case InvoiceStatus.PENDING:
-      return 'bg-blue-500';
-    case InvoiceStatus.FUNDED:
-      return 'bg-green-500';
-    case InvoiceStatus.REPAID:
+    case InvoiceStatus.CREATED:
       return 'bg-gray-500';
-    case InvoiceStatus.DEFAULTED:
-      return 'bg-red-500';
+    case InvoiceStatus.READY:
+      return 'bg-blue-500';
+    case InvoiceStatus.FINANCED:
+      return 'bg-green-500';
+    case InvoiceStatus.PAID:
+      return 'bg-gray-600';
     default:
       return 'bg-gray-500';
   }
