@@ -26,6 +26,10 @@ public struct BuyerEscrow has key, store {
 
 // GETTERS
 
+public fun invoice_id(buyer_escrow: &BuyerEscrow): ID {
+    buyer_escrow.invoice_id
+}
+
 public fun paid(buyer_escrow: &BuyerEscrow): bool {
     buyer_escrow.paid
 }
@@ -33,7 +37,6 @@ public fun paid(buyer_escrow: &BuyerEscrow): bool {
 public fun escrow_amount(buyer_escrow: &BuyerEscrow): u64 {
     buyer_escrow.escrow_amount
 }
-
 
 public fun create_escrow_internal(
     invoice_id: ID,

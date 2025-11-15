@@ -6,6 +6,7 @@ use invoice_financing::escrow::{BuyerEscrow};
 use invoice_financing::escrow;
 use sui::coin::Coin;
 use sui::sui::SUI;
+use sui::clock::Clock;
 
 const DIVISOR: u64 = 10_000;
 
@@ -24,10 +25,19 @@ const E_NOT_FUNDER: vector<u8> = b"The sender is not the funder";
 #[error]
 const E_INVOICE_NOT_FUNDED: vector<u8> = b"The invoice is not funded";
 
+#[error]
+const E_INVOICE_ID: vector<u8> = b"Invoice ID not consistent over buyer's escrow and funding";
+
 public struct Funding has key, store {
     id: UID,
     invoice_id: ID,
     funder: address,
+}
+
+// GETTERS
+
+public fun invoice_id(funding: &Funding): ID {
+    funding.invoice_id
 }
 
 entry fun fund_invoice(invoice: &mut Invoice, buyer_escrow: &BuyerEscrow, payment: Coin<SUI>, ctx: &mut TxContext) {
@@ -65,12 +75,16 @@ entry fun fund_invoice(invoice: &mut Invoice, buyer_escrow: &BuyerEscrow, paymen
     transfer::public_share_object(create_funding_internal(object::id(invoice), sender, ctx));
 }
 
-entry fun collect_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, funding: &Funding, ctx: &mut TxContext) {
+entry fun collect_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, funding: &Funding, clock: &Clock,  ctx: &mut TxContext) {
     let sender = ctx.sender();
-
     assert!(
         sender == funding.funder,
         E_NOT_FUNDER
+    );
+
+    assert!(
+        object::id(invoice) == escrow::invoice_id(buyer_escrow) && object::id(invoice) == funding.invoice_id,
+        E_INVOICE_ID
     );
     
     assert!(
