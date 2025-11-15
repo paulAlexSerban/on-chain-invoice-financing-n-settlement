@@ -9,6 +9,7 @@ import CreateInvoiceForm, {
 } from "@/components/CreateInvoiceForm";
 import { InvoiceData } from "@/components/InvoiceCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DebugPanel } from "@/components/DebugPanel";
 
 
 const BusinessDashboard = () => {
@@ -100,6 +101,11 @@ const BusinessDashboard = () => {
             buttonText="New Invoice"
             onButtonClick={() => console.log("New invoice clicked")}
           />
+
+          {/* Debug Panel */}
+          <div className="mb-6">
+            <DebugPanel />
+          </div>
 
           {/* Stats Overview */}
           <StatsOverview cards={cards} />
