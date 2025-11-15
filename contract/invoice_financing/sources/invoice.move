@@ -1,6 +1,6 @@
 module invoice_financing::invoice;
 
-public struct Invoice has key {
+public struct Invoice has key, store {
     id: UID,
 
     buyer: address,               // Who must repay
