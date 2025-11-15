@@ -313,3 +313,125 @@ export function useMyInvoices() {
     refetchInterval: 10000,
   });
 }
+
+// Hook to fetch invoices financed by the current user
+export function useMyInvestments() {
+  const { currentAccount } = useWalletKit();
+  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+
+  const suiClient = new SuiClient({
+    url:
+      network === "mainnet"
+        ? "https://fullnode.mainnet.sui.io:443"
+        : "https://fullnode.testnet.sui.io:443",
+  });
+
+  const fetchMyInvestments = async (): Promise<OnChainInvoice[]> => {
+    if (!currentAccount || !packageId) return [];
+
+    console.group("💼 Fetching My Investments");
+    console.log("Investor Address:", currentAccount.address);
+    console.log("Package ID:", packageId);
+
+    try {
+      // Query for InvoiceFunded events where the investor is the current user
+      const events = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::invoice_financing::InvoiceFunded`,
+        },
+        limit: 100,
+        order: "descending",
+      });
+
+      console.log("Total InvoiceFunded events:", events.data.length);
+
+      // Filter events where investor matches current user
+      const myInvestmentEvents = events.data.filter((event) => {
+        const parsedJson = event.parsedJson as any;
+        return parsedJson?.investor === currentAccount.address;
+      });
+
+      console.log("My investment events:", myInvestmentEvents.length);
+
+      // Extract invoice IDs
+      const invoiceIds = myInvestmentEvents
+        .map((event) => {
+          const parsedJson = event.parsedJson as any;
+          return parsedJson?.invoice_id;
+        })
+        .filter(Boolean);
+
+      console.log("Invoice IDs:", invoiceIds);
+
+      // Fetch each invoice object
+      const invoiceObjects = await Promise.all(
+        invoiceIds.map(async (id) => {
+          try {
+            const obj = await suiClient.getObject({
+              id: id,
+              options: {
+                showContent: true,
+                showOwner: true,
+              },
+            });
+            return obj;
+          } catch (error) {
+            console.error(`Error fetching invoice ${id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Parse invoice data
+      const invoices: OnChainInvoice[] = invoiceObjects
+        .filter(
+          (obj): obj is NonNullable<typeof obj> =>
+            obj !== null && obj.data?.content !== undefined
+        )
+        .map((obj) => {
+          const content = obj.data!.content as any;
+          const fields = content.fields;
+
+          const invoice: OnChainInvoice = {
+            id: obj.data!.objectId,
+            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
+            issuer: fields.issuer,
+            buyer: Buffer.from(fields.buyer).toString("utf-8"),
+            amount: fields.amount,
+            amountInSui: formatSuiAmount(fields.amount),
+            dueDate: parseInt(fields.due_date),
+            description: Buffer.from(fields.description).toString("utf-8"),
+            createdAt: parseInt(fields.created_at),
+            status: parseInt(fields.status),
+            financedBy: fields.financed_by,
+            investorPaid: fields.investor_paid,
+            investorPaidInSui: formatSuiAmount(fields.investor_paid || "0"),
+            supplierReceived: fields.supplier_received,
+            supplierReceivedInSui: formatSuiAmount(fields.supplier_received || "0"),
+            originationFeeCollected: fields.origination_fee_collected,
+            originationFeeCollectedInSui: formatSuiAmount(fields.origination_fee_collected || "0"),
+            discountRateBps: fields.discount_rate_bps,
+          };
+
+          return invoice;
+        });
+
+      console.log("My investments:", invoices.length);
+      console.groupEnd();
+
+      return invoices;
+    } catch (error) {
+      console.error("Error fetching my investments:", error);
+      console.groupEnd();
+      return [];
+    }
+  };
+
+  return useQuery({
+    queryKey: ["my-investments", currentAccount?.address, packageId],
+    queryFn: fetchMyInvestments,
+    enabled: !!currentAccount && !!packageId,
+    refetchInterval: 10000,
+  });
+}

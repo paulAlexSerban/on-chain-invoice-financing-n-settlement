@@ -10,8 +10,16 @@ export interface OnChainInvoice {
   createdAt: number; // timestamp in ms
   status: number; // 0=pending, 1=funded, 2=repaid, 3=defaulted
   financedBy?: string;
-  financedAmount: string; // in MIST
-  financedAmountInSui: number; // converted to SUI
+  financedAmount?: string; // in MIST (deprecated, use investorPaid)
+  financedAmountInSui?: number; // converted to SUI (deprecated)
+  // New fields from updated contract
+  investorPaid?: string; // Amount investor paid (in MIST)
+  investorPaidInSui?: number; // Amount investor paid (in SUI)
+  supplierReceived?: string; // Amount supplier received (in MIST)
+  supplierReceivedInSui?: number; // Amount supplier received (in SUI)
+  originationFeeCollected?: string; // Origination fee collected (in MIST)
+  originationFeeCollectedInSui?: number; // Origination fee collected (in SUI)
+  discountRateBps?: string; // Discount rate in basis points
 }
 
 export interface InvoiceFilters {

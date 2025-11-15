@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import { DebugPanel } from "@/components/DebugPanel";
 import { useInvoices } from "@/hooks/useInvoices";
 import { BlockchainInvoiceCard } from "@/components/BlockchainInvoiceCard";
+import { FinanceInvoiceModal } from "@/components/FinanceInvoiceModal";
 import { OnChainInvoice, InvoiceFilters, InvoiceStatus } from "@/types/invoice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,9 @@ const Marketplace = () => {
     sortOrder: 'desc',
   });
 
+  const [selectedInvoice, setSelectedInvoice] = useState<OnChainInvoice | null>(null);
+  const [financeModalOpen, setFinanceModalOpen] = useState(false);
+
   const { data: invoices, isLoading, error, refetch } = useInvoices(filters);
 
   const handleFilterChange = (key: keyof InvoiceFilters, value: any) => {
@@ -26,9 +30,14 @@ const Marketplace = () => {
   };
 
   const handleFinance = (invoice: OnChainInvoice) => {
-    console.log("Financing invoice:", invoice);
-    // TODO: Implement finance logic
-    alert(`Finance invoice ${invoice.invoiceNumber}\nAmount: ${invoice.amountInSui} SUI`);
+    console.log("Opening finance modal for invoice:", invoice);
+    setSelectedInvoice(invoice);
+    setFinanceModalOpen(true);
+  };
+
+  const handleFinanceSuccess = () => {
+    console.log("Invoice financed successfully, refreshing list...");
+    refetch();
   };
 
   const handleViewDetails = (invoice: OnChainInvoice) => {
@@ -247,6 +256,14 @@ const Marketplace = () => {
           )}
         </div>
       </div>
+
+      {/* Finance Invoice Modal */}
+      <FinanceInvoiceModal
+        invoice={selectedInvoice}
+        open={financeModalOpen}
+        onOpenChange={setFinanceModalOpen}
+        onSuccess={handleFinanceSuccess}
+      />
     </div>
   );
 };

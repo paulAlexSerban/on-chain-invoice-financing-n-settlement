@@ -8,63 +8,58 @@ import PortfolioDistribution from "@/components/PortfolioDistribution";
 import PerformanceMetrics from "@/components/PerformanceMetrics";
 import { Investment } from "@/components/InvestmentCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMyInvestments } from "@/hooks/useInvoices";
+import { OnChainInvoice, InvoiceStatus, formatDate } from "@/types/invoice";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 const InvestorDashboard = () => {
-  // Mock data for active investments
-  const activeInvestments: Investment[] = [
-    {
-      id: "1",
-      business: "TechCorp Solutions",
-      invoiceId: "INV-001",
-      invested: 47500,
-      expectedReturn: 50000,
-      returnRate: 5.26,
-      dueDate: "Feb 15, 2024",
-      rating: "A",
-      status: "active",
-    },
-    {
-      id: "2",
-      business: "Global Manufacturing Ltd",
-      invoiceId: "INV-002",
-      invested: 120000,
-      expectedReturn: 125000,
-      returnRate: 4.17,
-      dueDate: "Mar 1, 2024",
-      rating: "AA",
-      status: "active",
-    },
-  ];
+  const { data: investments, isLoading, error } = useMyInvestments();
 
-  // Mock data for settled investments
-  const settledInvestments: Investment[] = [
-    {
-      id: "3",
-      business: "Healthcare Services Co",
-      invoiceId: "INV-154",
-      invested: 58000,
-      actualReturn: 60000,
-      returnRate: 3.45,
-      settledDate: "Jan 28, 2024",
-      rating: "AAA",
-      status: "settled",
-    },
-    {
-      id: "4",
-      business: "Retail Innovations Inc",
-      invoiceId: "INV-143",
-      invested: 45600,
-      actualReturn: 48000,
-      returnRate: 5.26,
-      settledDate: "Jan 15, 2024",
-      rating: "A",
-      status: "settled",
-    },
-  ];
+  // Convert OnChainInvoice to Investment format
+  const convertToInvestment = (invoice: OnChainInvoice): Investment => {
+    const investorPaid = invoice.investorPaidInSui || 0;
+    const invoiceAmount = invoice.amountInSui;
+    const discountRateBps = parseInt(invoice.discountRateBps || "0");
+
+    // Calculate expected return (simplified - doesn't include platform fees)
+    // In reality, this should be: invoiceAmount - takeRateFee - settlementFee
+    const expectedReturn = invoiceAmount * 0.998; // Approximate after 10% take-rate on discount + settlement fee
+
+    const returnRate = investorPaid > 0
+      ? ((expectedReturn - investorPaid) / investorPaid) * 100
+      : 0;
+
+    return {
+      id: invoice.id,
+      business: invoice.issuer.slice(0, 6) + "..." + invoice.issuer.slice(-4), // Short address
+      invoiceId: invoice.invoiceNumber,
+      invested: investorPaid,
+      expectedReturn: invoice.status === InvoiceStatus.FUNDED ? expectedReturn : undefined,
+      actualReturn: invoice.status === InvoiceStatus.REPAID ? expectedReturn : undefined,
+      returnRate,
+      dueDate: invoice.status === InvoiceStatus.FUNDED ? formatDate(invoice.dueDate) : undefined,
+      settledDate: invoice.status === InvoiceStatus.REPAID ? formatDate(invoice.dueDate) : undefined,
+      rating: "A", // TODO: Implement rating system
+      status: invoice.status === InvoiceStatus.FUNDED ? "active" : "settled",
+    };
+  };
+
+  const activeInvestments: Investment[] = investments
+    ?.filter((inv) => inv.status === InvoiceStatus.FUNDED)
+    .map(convertToInvestment) || [];
+
+  const settledInvestments: Investment[] = investments
+    ?.filter((inv) => inv.status === InvoiceStatus.REPAID)
+    .map(convertToInvestment) || [];
 
   const handleInvestmentClick = (investment: Investment) => {
     console.log("Viewing investment:", investment);
-    // TODO: Implement investment detail view
+    const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+    const url = network === "mainnet"
+      ? `https://suivision.xyz/object/${investment.id}`
+      : `https://testnet.suivision.xyz/object/${investment.id}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -77,36 +72,63 @@ const InvestorDashboard = () => {
 
           <PortfolioStatsCards />
 
-          <Tabs defaultValue="active" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="active">Active Investments</TabsTrigger>
-              <TabsTrigger value="settled">Settled</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            </TabsList>
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                  <p className="text-muted-foreground">Loading your investments...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : error ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-4 text-destructive" />
+                  <p className="text-destructive font-semibold mb-2">Failed to load investments</p>
+                  <p className="text-sm text-muted-foreground">
+                    {error instanceof Error ? error.message : "Please try again later"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Tabs defaultValue="active" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="active">
+                  Active Investments ({activeInvestments.length})
+                </TabsTrigger>
+                <TabsTrigger value="settled">
+                  Settled ({settledInvestments.length})
+                </TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="active">
-              <InvestmentList
-                investments={activeInvestments}
-                emptyMessage="No active investments found"
-                onInvestmentClick={handleInvestmentClick}
-              />
-            </TabsContent>
+              <TabsContent value="active">
+                <InvestmentList
+                  investments={activeInvestments}
+                  emptyMessage="No active investments found. Visit the marketplace to finance invoices!"
+                  onInvestmentClick={handleInvestmentClick}
+                />
+              </TabsContent>
 
-            <TabsContent value="settled">
-              <InvestmentList
-                investments={settledInvestments}
-                emptyMessage="No settled investments found"
-                onInvestmentClick={handleInvestmentClick}
-              />
-            </TabsContent>
+              <TabsContent value="settled">
+                <InvestmentList
+                  investments={settledInvestments}
+                  emptyMessage="No settled investments yet."
+                  onInvestmentClick={handleInvestmentClick}
+                />
+              </TabsContent>
 
-            <TabsContent value="analytics">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <PortfolioDistribution />
-                <PerformanceMetrics />
-              </div>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="analytics">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <PortfolioDistribution />
+                  <PerformanceMetrics />
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </div>
     </div>
