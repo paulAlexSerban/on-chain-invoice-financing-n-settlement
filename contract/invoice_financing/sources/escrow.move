@@ -10,6 +10,9 @@ use invoice_financing::invoice::set_status;
 const E_NOT_BUYER: vector<u8> = b"Caller is not the invoice buyer";
 
 #[error]
+const E_INVALID_PAYMENT_AMOUNT: vector<u8> = b"Payment amount does not cover the escrow";
+
+#[error]
 const E_WRONG_INVOICE: vector<u8> = b"Escrow does not belong to the specified invoice";
 
 public struct BuyerEscrow has key, store {
@@ -20,6 +23,17 @@ public struct BuyerEscrow has key, store {
     paid: bool,
     escrow: Balance<SUI>,
 }
+
+// GETTERS
+
+public fun paid(buyer_escrow: &BuyerEscrow): bool {
+    buyer_escrow.paid
+}
+
+public fun escrow_amount(buyer_escrow: &BuyerEscrow): u64 {
+    buyer_escrow.escrow_amount
+}
+
 
 public fun create_escrow_internal(
     invoice_id: ID,
@@ -47,12 +61,16 @@ entry fun pay_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, paym
     );
 
     assert!(
-        buyer_escrow.invoice_id == object::id(invoice
-        ),
+        buyer_escrow.invoice_id == object::id(invoice),
         E_WRONG_INVOICE
     );
 
-    let _payment_amount = payment.balance().value();
+    let payment_amount = payment.balance().value();
+    assert!(
+        payment_amount == buyer_escrow.escrow_amount,
+        E_INVALID_PAYMENT_AMOUNT
+    );
+
     let balance = payment.into_balance();
     sui::balance::join(&mut buyer_escrow.escrow, balance);
     buyer_escrow.paid = true;
