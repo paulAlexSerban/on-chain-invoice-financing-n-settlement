@@ -1,6 +1,7 @@
 module invoice_financing::invoice_factory;
 
 use invoice_financing::invoice::create_invoice_internal;
+use invoice_financing::registry::SupplierCap;
 
 public struct InvoiceFactory has key {
     id: UID,
@@ -14,7 +15,7 @@ fun init(ctx: &mut TxContext) {
     transfer::share_object(factory);
 }
 
-entry fun issue_invoice(buyer: address, amount: u64, due_date: u64, companies_info: vector<u8>, discount_bps: u64, fee_bps: u64, ctx: &mut TxContext) {
+entry fun issue_invoice(buyer: address, amount: u64, due_date: u64, companies_info: vector<u8>, discount_bps: u64, fee_bps: u64, _cap: &SupplierCap, ctx: &mut TxContext) {
     let invoice = create_invoice_internal(ctx.sender(), buyer, amount, due_date, companies_info, discount_bps, fee_bps, ctx);
 
     transfer::public_share_object(invoice);
