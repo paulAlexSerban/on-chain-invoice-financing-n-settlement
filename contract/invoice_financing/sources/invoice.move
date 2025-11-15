@@ -1,7 +1,5 @@
 module invoice_financing::invoice;
 
-use invoice_financing::escrow::BuyerEscrow;
-
 public struct Invoice has key, store {
     id: UID,
 
@@ -16,6 +14,13 @@ public struct Invoice has key, store {
     
     escrow_bps: u64,              // Buyer's collateral amount of the total (in BPS)
     discount_bps: u64,            // Discount in BPS (e.g., 200 = 2%)
+    fee_bps: u64,                 // Protocol fee in BPS
+    
+    // Financing details (set after financing)
+    investor: Option<address>,
+    investor_paid: Option<u64>,
+    supplier_received: Option<u64>,
+    origination_fee: Option<u64>,
 }
 
 // GETTERS

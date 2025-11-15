@@ -55,7 +55,7 @@ public fun create_escrow_internal(
     }
 }
 
-public entry fun pay_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, payment: Coin<SUI>, ctx: &TxContext) {
+public fun pay_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, payment: Coin<SUI>, ctx: &TxContext) {
     let sender = ctx.sender();
 
     assert!(
@@ -88,9 +88,4 @@ public(package) fun escrow_balance_mut(buyer_escrow: &mut BuyerEscrow): &mut Bal
 /// Check if escrow is paid
 public fun is_paid(buyer_escrow: &BuyerEscrow): bool {
     buyer_escrow.paid
-}
-
-/// Get invoice ID
-public fun invoice_id(buyer_escrow: &BuyerEscrow): ID {
-    buyer_escrow.invoice_id
 }

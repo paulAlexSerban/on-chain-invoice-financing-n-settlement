@@ -75,7 +75,7 @@ entry fun fund_invoice(invoice: &mut Invoice, buyer_escrow: &BuyerEscrow, paymen
     transfer::public_share_object(create_funding_internal(object::id(invoice), sender, ctx));
 }
 
-entry fun collect_escrow(invoice: &mut Invoice, buyer_escrow: &mut BuyerEscrow, funding: &Funding, clock: &Clock,  ctx: &mut TxContext) {
+entry fun collect_escrow(invoice: &Invoice, buyer_escrow: &BuyerEscrow, funding: &Funding, _clock: &Clock,  ctx: &TxContext) {
     let sender = ctx.sender();
     assert!(
         sender == funding.funder,
