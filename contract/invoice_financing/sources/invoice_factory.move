@@ -47,5 +47,3 @@ entry fun issue_invoice(buyer: address, amount: u64, due_date: u64, companies_in
     transfer::public_share_object(create_escrow_internal(invoice_id, invoice::buyer(&invoice), escrow_amount, ctx));
     transfer::public_share_object(invoice);
 }
-
-

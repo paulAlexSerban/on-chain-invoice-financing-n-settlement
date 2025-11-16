@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Shield, CheckCircle, ExternalLink } from "lucide-react";
 
 export interface InvoiceData {
   id: string;
@@ -57,8 +58,15 @@ const InvoiceCard = ({ invoice, onViewClick }: InvoiceCardProps) => {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{invoice.invoiceNumber}</CardTitle>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <CardTitle>{invoice.invoiceNumber}</CardTitle>
+              {/* Trust Badges - On-chain verification */}
+              <div className="flex items-center gap-1" title="Verified on-chain">
+                <Shield className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+              </div>
+            </div>
             <CardDescription>Client: {invoice.clientName}</CardDescription>
           </div>
           {getStatusBadge()}
@@ -100,9 +108,25 @@ const InvoiceCard = ({ invoice, onViewClick }: InvoiceCardProps) => {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={onViewClick}>
-          {getButtonText()}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onViewClick} className="flex-1">
+            {getButtonText()}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+              const url = network === "mainnet"
+                ? `https://suivision.xyz/object/${invoice.id}`
+                : `https://testnet.suivision.xyz/object/${invoice.id}`;
+              window.open(url, '_blank');
+            }}
+            title="View on Sui Explorer"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

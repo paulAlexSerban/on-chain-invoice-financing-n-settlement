@@ -90,12 +90,12 @@ export default function Page() {
 **Check Console:**
 ```javascript
 ❌ Package ID not configured
-Current NEXT_PUBLIC_PACKAGE_ID: undefined
+Current NEXT_PUBLIC_CONTRACT_ID: undefined
 ```
 
 **Solution:**
-1. Check `dapp/.env.local` exists
-2. Verify it contains: `NEXT_PUBLIC_PACKAGE_ID=0x4d3f...`
+1. Check `dapp/.env` exists
+2. Verify it contains: `NEXT_PUBLIC_CONTRACT_ID=0x4d3f...`
 3. Restart dev server: `yarn dev`
 
 ### Issue: Transaction fails
@@ -156,7 +156,7 @@ Look for the error section:
 **Console Check:**
 ```javascript
 // Type in console:
-console.log(process.env.NEXT_PUBLIC_PACKAGE_ID);
+console.log(process.env.NEXT_PUBLIC_CONTRACT_ID);
 // Should show: 0x4d3f0eeb160eaff90fafc34654457604bdce0ff38775f45f87561f5469aeac12
 ```
 
@@ -265,7 +265,7 @@ console.log(`Text: ${text} = [${bytes}]`);
 **Meaning:** Package ID incorrect or not deployed
 
 **Check:**
-1. Verify Package ID in `.env.local`
+1. Verify Package ID in `.env`
 2. Check contract is deployed: `make build_contract`
 3. Verify on explorer: https://testnet.suivision.xyz/package/YOUR_PACKAGE_ID
 

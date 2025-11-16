@@ -13,7 +13,7 @@ export function DebugPanel() {
   const [copied, setCopied] = useState<string | null>(null);
   const [suiBalance, setSuiBalance] = useState<string | null>(null);
 
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   useEffect(() => {

@@ -17,10 +17,10 @@ import type { InvoiceWithHistory, InvoiceStatus, InvoiceEvent } from '@/lib/api/
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Validation
     if (!id || !id.startsWith('0x')) {
@@ -32,7 +32,7 @@ export async function GET(
     }
 
     // Setup blockchain connection
-    const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+    const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
     const network = process.env.NEXT_PUBLIC_NETWORK || 'testnet';
 
     if (!packageId) {

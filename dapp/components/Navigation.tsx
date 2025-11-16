@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Coins, Menu, X, Moon, Sun } from "lucide-react";
+import { Coins, Menu, X, Moon, Sun, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { ConnectButton } from "@mysten/wallet-kit";
+import { ConnectButton, useWalletKit } from "@mysten/wallet-kit";
 
 const Navigation = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { currentAccount } = useWalletKit();
 
   useEffect(() => {
     setMounted(true);
@@ -19,6 +20,13 @@ const Navigation = () => {
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
+
+  // Check if current user is the treasury owner
+  const ownerAddress = process.env.NEXT_PUBLIC_OWNER_ADDRESS;
+  const isOwner =
+    !!currentAccount?.address &&
+    !!ownerAddress &&
+    currentAccount.address.toLowerCase() === ownerAddress.toLowerCase();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -57,6 +65,21 @@ const Navigation = () => {
             >
               For Investors
             </Link>
+            <Link
+              href="/dashboard/settle"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
+              For Buyers
+            </Link>
+            {isOwner && (
+              <Link
+                href="/dashboard/admin"
+                className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+              >
+                <Shield className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -122,6 +145,23 @@ const Navigation = () => {
             >
               For Investors
             </Link>
+            <Link
+              href="/dashboard/settle"
+              className="block text-sm font-medium hover:text-primary transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Settle Invoices
+            </Link>
+            {isOwner && (
+              <Link
+                href="/dashboard/admin"
+                className="flex items-center gap-1 text-sm font-medium hover:text-primary transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Shield className="h-4 w-4" />
+                Admin Dashboard
+              </Link>
+            )}
             <div className="flex gap-2">
               <Button
                 variant="ghost"

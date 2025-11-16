@@ -388,10 +388,10 @@ const financeInvoice = async (params: FinanceInvoiceParams) => {
 
 ## Environment Variables
 
-Add to `.env.local`:
+Add to `.env`:
 
 ```bash
-NEXT_PUBLIC_PACKAGE_ID=0x...        # Your deployed package ID
+NEXT_PUBLIC_CONTRACT_ID=0x...        # Your deployed package ID
 NEXT_PUBLIC_PLATFORM_ID=0x...       # Platform shared object ID (from deployment)
 NEXT_PUBLIC_NETWORK=testnet         # or mainnet
 ```
@@ -412,16 +412,16 @@ sui move build
 sui client publish --gas-budget 100000000
 
 # Note the:
-# - Package ID (set as NEXT_PUBLIC_PACKAGE_ID)
+# - Package ID (set as NEXT_PUBLIC_CONTRACT_ID)
 # - Platform object ID (set as NEXT_PUBLIC_PLATFORM_ID)
 ```
 
 ### 2. Configure Environment
 
-Update `dapp/.env.local`:
+Update `dapp/.env`:
 
 ```bash
-NEXT_PUBLIC_PACKAGE_ID=0xabcd...
+NEXT_PUBLIC_CONTRACT_ID=0xabcd...
 NEXT_PUBLIC_PLATFORM_ID=0xef01...
 NEXT_PUBLIC_NETWORK=testnet
 ```

@@ -145,7 +145,7 @@ The marketplace filters work on ALL invoices:
 **Debug:**
 ```typescript
 // In browser console
-const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
 console.log("Package ID:", packageId);
 
 // Check events manually
@@ -156,7 +156,7 @@ console.log("Package ID:", packageId);
 
 **Possible causes:**
 1. No invoices created yet → Create some!
-2. Package ID not configured → Check .env.local
+2. Package ID not configured → Check .env
 3. Network mismatch → Verify testnet/mainnet
 4. Events not indexed yet → Wait ~10 seconds, refresh
 

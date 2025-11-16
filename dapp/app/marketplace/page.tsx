@@ -11,7 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, FileText, DollarSign, RefreshCw, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, TrendingUp, FileText, AlertCircle } from "lucide-react";
+import SUILogo from "@/components/ui/sui-logo";
 
 const Marketplace = () => {
   const [filters, setFilters] = useState<InvoiceFilters>({
@@ -106,7 +108,7 @@ const Marketplace = () => {
                     <p className="text-sm text-muted-foreground">Total Value</p>
                     <p className="text-2xl font-bold">{totalValue.toFixed(2)} SUI</p>
                   </div>
-                  <DollarSign className="h-8 w-8 text-muted-foreground" />
+                  <SUILogo   className="h-8 w-8 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -135,47 +137,41 @@ const Marketplace = () => {
                   </Select>
                 </div>
 
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Sort By</label>
-                  <Select
-                    value={filters.sortBy || 'createdAt'}
-                    onValueChange={(value) => handleFilterChange('sortBy', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="createdAt">Newest First</SelectItem>
-                      <SelectItem value="amount">Amount</SelectItem>
-                      <SelectItem value="dueDate">Due Date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Amount Range Filters */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-2 border-t">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">Min Amount (SUI)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      placeholder="Min amount"
+                      value={filters.minAmount || ''}
+                      onChange={(e) => handleFilterChange('minAmount', e.target.value ? parseFloat(e.target.value) : undefined)}
+                    />
+                  </div>
 
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Order</label>
-                  <Select
-                    value={filters.sortOrder || 'desc'}
-                    onValueChange={(value) => handleFilterChange('sortOrder', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">Descending</SelectItem>
-                      <SelectItem value="asc">Ascending</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">Max Amount (SUI)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      placeholder="Max amount"
+                      value={filters.maxAmount || ''}
+                      onChange={(e) => handleFilterChange('maxAmount', e.target.value ? parseFloat(e.target.value) : undefined)}
+                    />
+                  </div>
 
-                <div className="flex items-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => refetch()}
-                    disabled={isLoading}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  </Button>
+                  <div className="flex-1 flex items-end">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setFilters({ status: 'created', sortBy: 'createdAt', sortOrder: 'desc' })}
+                      className="w-full"
+                    >
+                      Reset Filters
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -246,7 +242,7 @@ const Marketplace = () => {
                       <BlockchainInvoiceCard
                         key={invoice.id}
                         invoice={invoice}
-                        onFinance={invoice.status === InvoiceStatus.PENDING ? handleFinance : undefined}
+                        onFinance={invoice.status === InvoiceStatus.CREATED ? handleFinance : undefined}
                         onViewDetails={handleViewDetails}
                       />
                     ))}

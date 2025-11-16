@@ -244,7 +244,7 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
           {!hasSupplierCap && isConnected && (
             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-md mb-4">
               <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
-                ⚠️ You need to register as a supplier before creating invoices.
+                ⚠️ You need to register as a supplier/seller before creating invoices.
               </p>
               <Button
                 type="button"

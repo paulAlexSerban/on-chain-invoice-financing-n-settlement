@@ -14,7 +14,7 @@ export function useSupplierRegistration() {
   
   const [isLoading, setIsLoading] = useState(false);
 
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID || "";
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID || "";
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -58,7 +58,7 @@ export function useSupplierRegistration() {
       const txb = new TransactionBlock();
 
       // Register supplier - this creates and transfers SupplierCap
-      const moveCallTarget = `${packageId}::registry::register_supplier`;
+      const moveCallTarget = `${packageId}::registry::register_supplier` as `${string}::${string}::${string}`;
       console.log("🎯 Move Call Target:", moveCallTarget);
       
       txb.moveCall({
@@ -70,7 +70,7 @@ export function useSupplierRegistration() {
       console.log("📤 Sending registration transaction...");
 
       const result = await signAndExecuteTransactionBlock({
-        transactionBlock: txb,
+        transactionBlock: txb as any,
         options: {
           showEffects: true,
           showObjectChanges: true,
@@ -92,7 +92,9 @@ export function useSupplierRegistration() {
             change.type === 'created' && 
             (change.objectType?.includes('SupplierCap') || change.objectType?.includes('registry::SupplierCap'))
         );
-        supplierCapId = supplierCapChange?.objectId;
+        if (supplierCapChange && 'objectId' in supplierCapChange) {
+          supplierCapId = (supplierCapChange as any).objectId;
+        }
         console.log("🔑 SupplierCap from objectChanges:", supplierCapId);
       }
       
@@ -115,7 +117,9 @@ export function useSupplierRegistration() {
             change.type === 'created' &&
             change.owner?.AddressOwner === currentAccount.address
         );
-        supplierCapId = transferred?.objectId;
+        if (transferred && 'objectId' in transferred) {
+          supplierCapId = (transferred as any).objectId;
+        }
         console.log("🔑 SupplierCap from transferred:", supplierCapId);
       }
 

@@ -12,7 +12,7 @@ import {
 
 export function useInvoices(filters?: InvoiceFilters) {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -284,9 +284,11 @@ export function useInvoice(invoiceId: string) {
 }
 
 // Hook to fetch user's invoices (created by them)
+// Uses event-based query to find all invoices where issuer = current user
+// This works even after invoices are financed and ownership transfers
 export function useMyInvoices() {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -299,23 +301,67 @@ export function useMyInvoices() {
   const fetchMyInvoices = async (): Promise<OnChainInvoice[]> => {
     if (!currentAccount || !packageId) return [];
 
+    console.group("📋 Fetching My Invoices (Business Dashboard)");
+    console.log("Issuer Address:", currentAccount.address);
+    console.log("Package ID:", packageId);
+
     try {
-      // Get objects owned by current user
-      const ownedObjects = await suiClient.getOwnedObjects({
-        owner: currentAccount.address,
-        filter: {
-          StructType: `${packageId}::invoice_financing::Invoice`,
+      // Query InvoiceCreated events to find all invoices created by this user
+      // This is the correct approach per the documentation - event-based indexing
+      const events = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::invoice_financing::InvoiceCreated`,
         },
-        options: {
-          showContent: true,
-          showOwner: true,
-        },
+        limit: 100, // Adjust as needed
+        order: "descending",
       });
 
-      const invoices = ownedObjects.data
-        .filter((obj) => obj.data?.content)
+      console.log("Total InvoiceCreated events found:", events.data.length);
+
+      // Filter events where issuer matches current user
+      const myInvoiceEvents = events.data.filter((event) => {
+        const parsedJson = event.parsedJson as any;
+        return parsedJson?.issuer === currentAccount.address;
+      });
+
+      console.log("Events for this issuer:", myInvoiceEvents.length);
+
+      // Extract invoice IDs from events
+      const invoiceIds = myInvoiceEvents
+        .map((event) => {
+          const parsedJson = event.parsedJson as any;
+          return parsedJson?.invoice_id;
+        })
+        .filter(Boolean);
+
+      console.log("Invoice IDs:", invoiceIds);
+
+      // Fetch each invoice object by ID
+      const invoiceObjects = await Promise.all(
+        invoiceIds.map(async (id) => {
+          try {
+            const obj = await suiClient.getObject({
+              id: id,
+              options: {
+                showContent: true,
+                showOwner: true,
+              },
+            });
+            return obj;
+          } catch (error) {
+            console.error(`Error fetching invoice ${id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      console.log("Successfully fetched objects:", invoiceObjects.filter(o => o !== null).length);
+
+      // Parse invoice data
+      const invoices = invoiceObjects
+        .filter((obj) => obj !== null && obj.data?.content)
         .map((obj) => {
-          const content = obj.data!.content as any;
+          const content = obj!.data!.content as any;
           const fields = content.fields;
 
           // Helper to extract Option<T> values
@@ -343,7 +389,7 @@ export function useMyInvoices() {
           }
 
           return {
-            id: obj.data!.objectId,
+            id: obj!.data!.objectId,
             invoiceNumber: companiesInfo.invoiceNumber || "N/A",
             issuer: fields.supplier || "",
             buyer: fields.buyer || "",
@@ -369,9 +415,20 @@ export function useMyInvoices() {
           };
         });
 
+      console.log("Parsed invoices:", invoices.length);
+      console.log("Status breakdown:", {
+        created: invoices.filter(i => i.status === InvoiceStatus.CREATED).length,
+        ready: invoices.filter(i => i.status === InvoiceStatus.READY).length,
+        financed: invoices.filter(i => i.status === InvoiceStatus.FINANCED).length,
+        paid: invoices.filter(i => i.status === InvoiceStatus.PAID).length,
+        defaulted: invoices.filter(i => i.status === InvoiceStatus.DEFAULTED).length,
+      });
+      console.groupEnd();
+
       return invoices;
     } catch (error) {
       console.error("Error fetching my invoices:", error);
+      console.groupEnd();
       return [];
     }
   };
@@ -387,7 +444,7 @@ export function useMyInvoices() {
 // Hook to fetch invoices financed by the current user
 export function useMyInvestments() {
   const { currentAccount } = useWalletKit();
-  const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
   const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 
   const suiClient = new SuiClient({
@@ -530,6 +587,130 @@ export function useMyInvestments() {
   return useQuery({
     queryKey: ["my-investments", currentAccount?.address, packageId],
     queryFn: fetchMyInvestments,
+    enabled: !!currentAccount && !!packageId,
+    refetchInterval: 10000,
+  });
+}
+
+// Hook to fetch invoices where the current user is the buyer (debtor)
+// These are invoices the user needs to settle/pay
+export function useMyPayableInvoices() {
+  const { currentAccount } = useWalletKit();
+  const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
+  const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+
+  const suiClient = new SuiClient({
+    url:
+      network === "mainnet"
+        ? "https://fullnode.mainnet.sui.io:443"
+        : "https://fullnode.testnet.sui.io:443",
+  });
+
+  const fetchMyPayableInvoices = async (): Promise<OnChainInvoice[]> => {
+    if (!currentAccount || !packageId) return [];
+
+    console.group("💳 Fetching My Payable Invoices (as Buyer/Debtor)");
+    console.log("Buyer Address:", currentAccount.address);
+
+    try {
+      // Get all InvoiceCreated events
+      const events = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::invoice_financing::InvoiceCreated`,
+        },
+        limit: 50,
+        order: "descending",
+      });
+
+      console.log("Total invoices found:", events.data.length);
+
+      // Extract invoice IDs
+      const invoiceIds = events.data
+        .map((event) => {
+          const parsedJson = event.parsedJson as any;
+          return parsedJson?.invoice_id;
+        })
+        .filter(Boolean);
+
+      // Fetch each invoice and filter by buyer
+      const invoiceObjects = await Promise.all(
+        invoiceIds.map(async (id) => {
+          try {
+            const obj = await suiClient.getObject({
+              id: id,
+              options: {
+                showContent: true,
+                showOwner: true,
+              },
+            });
+            return obj;
+          } catch (error) {
+            console.error(`Error fetching invoice ${id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Parse and filter invoices where current user is the buyer
+      const invoices = invoiceObjects
+        .filter(
+          (obj): obj is NonNullable<typeof obj> =>
+            obj !== null && obj.data?.content !== undefined
+        )
+        .map((obj) => {
+          const content = obj.data!.content as any;
+          const fields = content.fields;
+
+          const invoice: OnChainInvoice = {
+            id: obj.data!.objectId,
+            invoiceNumber: Buffer.from(fields.invoice_number).toString("utf-8"),
+            issuer: fields.issuer,
+            buyer: Buffer.from(fields.buyer).toString("utf-8"),
+            amount: fields.amount,
+            amountInSui: formatSuiAmount(fields.amount),
+            dueDate: parseInt(fields.due_date),
+            description: Buffer.from(fields.description).toString("utf-8"),
+            createdAt: parseInt(fields.created_at),
+            status: parseInt(fields.status),
+            financedBy: fields.financed_by,
+            investorPaid: fields.investor_paid,
+            investorPaidInSui: formatSuiAmount(fields.investor_paid || "0"),
+            supplierReceived: fields.supplier_received,
+            supplierReceivedInSui: formatSuiAmount(fields.supplier_received || "0"),
+            originationFeeCollected: fields.origination_fee_collected,
+            originationFeeCollectedInSui: formatSuiAmount(fields.origination_fee_collected || "0"),
+            discountRateBps: fields.discount_rate_bps,
+          };
+
+          return invoice;
+        })
+        .filter((invoice) => {
+          // Filter to only invoices where current user is the buyer
+          // Note: buyer field in contract is stored as vector<u8> (bytes)
+          // We compare the decoded buyer field with current address
+          return invoice.buyer === currentAccount.address;
+        });
+
+      console.log("My payable invoices:", invoices.length);
+      console.log("Status breakdown:", {
+        created: invoices.filter(i => i.status === InvoiceStatus.CREATED).length,
+        ready: invoices.filter(i => i.status === InvoiceStatus.READY).length,
+        financed: invoices.filter(i => i.status === InvoiceStatus.FINANCED).length,
+        paid: invoices.filter(i => i.status === InvoiceStatus.PAID).length,
+      });
+      console.groupEnd();
+
+      return invoices;
+    } catch (error) {
+      console.error("Error fetching payable invoices:", error);
+      console.groupEnd();
+      return [];
+    }
+  };
+
+  return useQuery({
+    queryKey: ["my-payable-invoices", currentAccount?.address, packageId],
+    queryFn: fetchMyPayableInvoices,
     enabled: !!currentAccount && !!packageId,
     refetchInterval: 10000,
   });

@@ -3,8 +3,9 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Building2, DollarSign, Clock, TrendingDown, ExternalLink } from "lucide-react";
+import { Calendar, Building2, Clock, TrendingDown, ExternalLink, Shield, CheckCircle } from "lucide-react";
 import { OnChainInvoice, getStatusLabel, getStatusColor, formatDate, getDaysUntilDue } from "@/types/invoice";
+import SUILogo from "./ui/sui-logo";
 
 interface BlockchainInvoiceCardProps {
   invoice: OnChainInvoice;
@@ -25,14 +26,31 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
   const discountRate = 0.05;
   const potentialReturn = invoice.amountInSui * discountRate;
 
+  // Risk Indicator Logic (F8 from PRD)
+  const getRiskLevel = () => {
+    if (isOverdue) return { level: 'high', color: 'bg-red-500', label: 'High Risk' };
+    if (daysUntilDue <= 7) return { level: 'medium', color: 'bg-yellow-500', label: 'Medium Risk' };
+    if (daysUntilDue <= 30 && invoice.amountInSui > 10000) return { level: 'medium', color: 'bg-yellow-500', label: 'Medium Risk' };
+    return { level: 'low', color: 'bg-green-500', label: 'Low Risk' };
+  };
+
+  const risk = getRiskLevel();
+
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
-            <h3 className="font-semibold text-lg truncate">
-              {invoice.invoiceNumber}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-lg truncate">
+                {invoice.invoiceNumber}
+              </h3>
+              {/* Trust Badges - On-chain verification */}
+              <div className="flex items-center gap-1" title="Verified on-chain and issuance confirmed">
+                <Shield className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Building2 className="h-3.5 w-3.5" />
               <span className="truncate">{invoice.buyer}</span>
@@ -51,7 +69,7 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
         {/* Amount */}
         <div className="flex items-center justify-between p-3 bg-primary/5 rounded-md">
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-primary" />
+            <SUILogo className="h-4 w-4 text-primary" />
             <span className="text-sm text-muted-foreground">Invoice Amount</span>
           </div>
           <span className="font-bold text-lg">
@@ -99,8 +117,19 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
           </div>
         )}
 
+        {/* Risk Indicator (F8 from PRD) */}
+        {invoice.status === 0 && (
+          <div className="flex items-center justify-between p-2 rounded-md border">
+            <span className="text-xs text-muted-foreground">Risk Level</span>
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${risk.color}`} />
+              <span className="text-xs font-medium">{risk.label}</span>
+            </div>
+          </div>
+        )}
+
         {/* Funded Info */}
-        {invoice.status === 1 && invoice.financedAmountInSui > 0 && (
+        {invoice.status === 1 && invoice.financedAmountInSui && invoice.financedAmountInSui > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Funded Amount</span>
             <span className="font-medium">

@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Fetch invoices from Sui blockchain
-    const packageId = process.env.NEXT_PUBLIC_PACKAGE_ID;
+    const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
     const network = process.env.NEXT_PUBLIC_NETWORK || 'testnet';
 
     if (!packageId) {

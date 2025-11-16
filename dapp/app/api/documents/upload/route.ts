@@ -101,9 +101,5 @@ export async function OPTIONS() {
   });
 }
 
-// Disable body parsing for multipart/form-data
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Note: In App Router, body parsing configuration is not needed
+// The route handles FormData directly

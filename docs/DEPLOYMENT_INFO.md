@@ -56,10 +56,10 @@ The Platform object was initialized with these default fees:
 
 ## Environment Variables
 
-The following variables have been configured in `dapp/.env.local`:
+The following variables have been configured in `dapp/.env`:
 
 ```bash
-NEXT_PUBLIC_PACKAGE_ID=0x2317bdda09d8e73272f3dc2f96245f2b854eb3fa246099edb6cacd84d757aba4
+NEXT_PUBLIC_CONTRACT_ID=0x2317bdda09d8e73272f3dc2f96245f2b854eb3fa246099edb6cacd84d757aba4
 NEXT_PUBLIC_PLATFORM_ID=0x4d937c5a4fff22270da4afc7ba94b1f90e073d0c8629d35703ed547e3aa135cb
 NEXT_PUBLIC_NETWORK=testnet
 ```
@@ -285,7 +285,7 @@ console.log(`Total Platform Revenue: ${Number(totalRevenue) / 1_000_000_000} SUI
 ### Frontend Issues
 
 1. **"Package ID not configured" error**
-   - Ensure `.env.local` exists in `dapp/` directory
+   - Ensure `.env` exists in `dapp/` directory
    - Restart dev server: `npm run dev`
 
 2. **"Platform ID not configured" error**

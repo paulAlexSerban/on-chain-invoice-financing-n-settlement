@@ -1,7 +1,5 @@
 module invoice_financing::invoice;
 
-use std::option::{Self, Option};
-
 public struct Invoice has key, store {
     id: UID,
 
@@ -15,15 +13,14 @@ public struct Invoice has key, store {
     status: u8,                   // 0=Created,1=Ready,2=Financed,3=Paid,4=Defaulted
     
     escrow_bps: u64,              // Buyer's collateral amount of the total (in BPS)
-
     discount_bps: u64,            // Discount in BPS (e.g., 200 = 2%)
-    fee_bps: u64,                 // Protocol fee taken out of the discount
-
-    // Financing details (set when financed)
-    investor: Option<address>,    // Who financed the invoice
-    investor_paid: Option<u64>,   // Amount investor paid
-    supplier_received: Option<u64>, // Amount supplier received
-    origination_fee: Option<u64>, // Origination fee collected
+    fee_bps: u64,                 // Protocol fee in BPS
+    
+    // Financing details (set after financing)
+    investor: Option<address>,
+    investor_paid: Option<u64>,
+    supplier_received: Option<u64>,
+    origination_fee: Option<u64>,
 }
 
 // GETTERS

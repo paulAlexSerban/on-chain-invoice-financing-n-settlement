@@ -24,7 +24,7 @@ export function getSuiClient(): SuiClient {
  * Get package ID from environment
  */
 export function getPackageId(): string | null {
-  return process.env.NEXT_PUBLIC_PACKAGE_ID || null;
+  return process.env.NEXT_PUBLIC_CONTRACT_ID || null;
 }
 
 /**

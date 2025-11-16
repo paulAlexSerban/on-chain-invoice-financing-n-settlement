@@ -8,7 +8,7 @@ import {
 
 export type StatsOverviewProps = {
   title: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>> | React.ComponentType<any>;
   value: string | number;
   description: string;
   highlight?: boolean;

@@ -28,7 +28,7 @@ The frontend has been updated to work with your existing smart contract modules:
 - ✅ Registers user as supplier
 - ✅ Gets SupplierCap object ID
 - ✅ Stores SupplierCap ID in localStorage
-- ✅ Suggests updating .env.local
+- ✅ Suggests updating .env
 
 ### 3. Updated Invoice Form
 **File:** `dapp/components/CreateInvoiceForm.tsx`
@@ -63,7 +63,7 @@ Look for:
 [ SUCCESS ] Factory Object ID: 0x...
 ```
 
-**Add to `dapp/.env.local`:**
+**Add to `dapp/.env`:**
 ```env
 NEXT_PUBLIC_FACTORY_OBJECT_ID=0x...
 ```
@@ -95,7 +95,7 @@ sui client call \
 sui client objects | grep SupplierCap
 ```
 
-**Add to `dapp/.env.local`:**
+**Add to `dapp/.env`:**
 ```env
 NEXT_PUBLIC_SUPPLIER_CAP_ID=0x...
 ```
@@ -173,9 +173,9 @@ public struct Invoice has key, store {
 
 ## Environment Variables
 
-**Required in `dapp/.env.local`:**
+**Required in `dapp/.env`:**
 ```env
-NEXT_PUBLIC_PACKAGE_ID=0x...
+NEXT_PUBLIC_CONTRACT_ID=0x...
 NEXT_PUBLIC_FACTORY_OBJECT_ID=0x...
 NEXT_PUBLIC_SUPPLIER_CAP_ID=0x...  # Or auto-stored after registration
 NEXT_PUBLIC_NETWORK=testnet
@@ -194,7 +194,7 @@ NEXT_PUBLIC_NETWORK=testnet
 ## Troubleshooting
 
 ### "Factory Object ID not configured"
-**Solution:** Get factory ID from publish output and add to `.env.local`
+**Solution:** Get factory ID from publish output and add to `.env`
 
 ### "SupplierCap required"
 **Solution:** Click "Register as Supplier" button first
