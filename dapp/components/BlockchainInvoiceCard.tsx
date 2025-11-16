@@ -104,8 +104,8 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
           </span>
         </div>
 
-        {/* Potential Return */}
-        {invoice.status === 0 && (
+        {/* Potential Return - Only for Ready/Available invoices */}
+        {invoice.status === 1 && (
           <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-md">
             <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
               <TrendingDown className="h-3.5 w-3.5" />
@@ -117,8 +117,8 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
           </div>
         )}
 
-        {/* Risk Indicator (F8 from PRD) */}
-        {invoice.status === 0 && (
+        {/* Risk Indicator (F8 from PRD) - Only for Ready/Available invoices */}
+        {invoice.status === 1 && (
           <div className="flex items-center justify-between p-2 rounded-md border">
             <span className="text-xs text-muted-foreground">Risk Level</span>
             <div className="flex items-center gap-2">
@@ -129,11 +129,11 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
         )}
 
         {/* Funded Info */}
-        {invoice.status === 1 && invoice.financedAmountInSui && invoice.financedAmountInSui > 0 && (
+        {invoice.status === 2 && invoice.investorPaidInSui && invoice.investorPaidInSui > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Funded Amount</span>
             <span className="font-medium">
-              {invoice.financedAmountInSui.toLocaleString()} SUI
+              {invoice.investorPaidInSui.toLocaleString()} SUI
             </span>
           </div>
         )}
@@ -149,7 +149,8 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
       </CardContent>
 
       <CardFooter className="flex gap-2">
-        {invoice.status === 0 && onFinance && (
+        {/* Finance button only for Ready (1) invoices */}
+        {invoice.status === 1 && onFinance && (
           <Button 
             onClick={() => onFinance(invoice)}
             className="flex-1"
@@ -158,16 +159,18 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
           </Button>
         )}
         
+        {/* View Details button */}
         {onViewDetails && (
           <Button 
-            variant={invoice.status === 0 ? "outline" : "default"}
+            variant={invoice.status === 1 ? "outline" : "default"}
             onClick={() => onViewDetails(invoice)}
-            className={invoice.status === 0 ? "" : "flex-1"}
+            className={invoice.status === 1 ? "" : "flex-1"}
           >
             View Details
           </Button>
         )}
 
+        {/* Explorer link */}
         <Button
           variant="ghost"
           size="icon"

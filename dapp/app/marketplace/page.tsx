@@ -17,7 +17,7 @@ import SUILogo from "@/components/ui/sui-logo";
 
 const Marketplace = () => {
   const [filters, setFilters] = useState<InvoiceFilters>({
-    status: 'all', // Show all invoices by default
+    status: 'ready', // Show ready/available invoices by default
     sortBy: 'createdAt',
     sortOrder: 'desc',
   });
@@ -166,7 +166,7 @@ const Marketplace = () => {
                   <div className="flex-1 flex items-end">
                     <Button
                       variant="ghost"
-                      onClick={() => setFilters({ status: 'created', sortBy: 'createdAt', sortOrder: 'desc' })}
+                      onClick={() => setFilters({ status: 'ready', sortBy: 'createdAt', sortOrder: 'desc' })}
                       className="w-full"
                     >
                       Reset Filters
@@ -242,7 +242,7 @@ const Marketplace = () => {
                       <BlockchainInvoiceCard
                         key={invoice.id}
                         invoice={invoice}
-                        onFinance={invoice.status === InvoiceStatus.CREATED ? handleFinance : undefined}
+                        onFinance={invoice.status === InvoiceStatus.READY ? handleFinance : undefined}
                         onViewDetails={handleViewDetails}
                       />
                     ))}
