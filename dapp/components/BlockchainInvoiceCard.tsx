@@ -39,26 +39,26 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="space-y-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-lg truncate">
                 {invoice.invoiceNumber}
               </h3>
               {/* Trust Badges - On-chain verification */}
-              <div className="flex items-center gap-1" title="Verified on-chain and issuance confirmed">
+              <div className="flex items-center gap-1 shrink-0" title="Verified on-chain and issuance confirmed">
                 <Shield className="h-3.5 w-3.5 text-green-500" />
                 <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Building2 className="h-3.5 w-3.5" />
-              <span className="truncate">{invoice.buyer}</span>
+              <Building2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate min-w-0">{invoice.buyer}</span>
             </div>
           </div>
           <Badge 
             variant="outline"
-            className={`${getStatusColor(invoice.status)} text-white border-none`}
+            className={`${getStatusColor(invoice.status)} text-white border-none shrink-0`}
           >
             {getStatusLabel(invoice.status)}
           </Badge>
