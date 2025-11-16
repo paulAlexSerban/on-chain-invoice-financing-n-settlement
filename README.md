@@ -4,6 +4,8 @@
 
 ChainInvoice is a decentralized application (dApp) built on the Sui blockchain that enables businesses to finance their invoices through on-chain mechanisms. By leveraging smart contracts, ChainInvoice facilitates secure and transparent invoice financing and settlement processes.
 
+# Pitch Deck: https://www.canva.com/design/DAG42jLUUR8/k6I1cCCVRTkfdtjhfooTTg/edit?utm_content=DAG42jLUUR8&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
+# Live Demo: https://chain-invoice.vercel.app/
 ### What this is about
 
 Convert supplier invoices into on-chain, tradeable invoice-objects that financiers can buy at a discount. When the invoice is paid (confirmed by trusted sources), settlement happens on-chain and proceeds are released to the financier. It’s invoice factoring / receivables financing reimagined with verifiable proofs and fast settlement.
