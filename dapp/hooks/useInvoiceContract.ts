@@ -223,9 +223,10 @@ export function useInvoiceContract() {
       // discount_bps: 500 = 5% discount
       // fee_bps: 100 = 1% fee  
       // escrow_bps: 1000 = 10% escrow
-      const discountBps = params.discountBps || 500; // 5% default
-      const feeBps = params.feeBps || 100; // 1% default
-      const escrowBps = params.escrowBps || 1000; // 10% default
+      // Use ?? instead of || to allow 0 values (0 is valid BPS)
+      const discountBps = params.discountBps ?? 500; // 5% default
+      const feeBps = params.feeBps ?? 100; // 1% default
+      const escrowBps = params.escrowBps ?? 1000; // 10% default
 
       console.log("💰 Financial params:");
       console.log(`  - Discount: ${discountBps} BPS (${(discountBps / 100).toFixed(2)}%)`);
@@ -284,14 +285,35 @@ export function useInvoiceContract() {
       console.log("  - companiesInfoBytes length:", companiesInfoBytes.length);
       console.log("  - escrowBps:", escrowBps);
       console.log("  - discountBps:", discountBps);
-      console.log("  - feeBps:", feeBps);
       console.log("  - supplierCapId:", supplierCapId, "(length:", supplierCapId.length, ")");
-      console.log("  - Total arguments: 8");
+
+      // Check Treasury ID is configured
+      const treasuryId = process.env.NEXT_PUBLIC_TREASURY_ID;
+      if (!treasuryId) {
+        console.error("❌ Treasury ID not configured");
+        toast({
+          title: "Configuration Error",
+          description: "Treasury ID not configured. Please check .env.local",
+          variant: "destructive",
+        });
+        console.groupEnd();
+        setIsLoading(false);
+        return null;
+      }
+
+      console.log("  - treasuryId:", treasuryId);
+      console.log("  - Total arguments: 9");
 
       // Call issue_invoice function with SupplierCap
-      // The function signature is: issue_invoice(buyer: address, amount: u64, due_date: u64, companies_info: vector<u8>, escrow_bps: u64, discount_bps: u64, fee_bps: u64, _cap: &SupplierCap, ctx: &mut TxContext)
-      // Note: This is a module-level entry function, not a method on InvoiceFactory, so we don't pass the factory object
-      // The function expects 8 parameters (ctx is implicit in SDK)
+      // The function signature is: issue_invoice(buyer: address, amount: u64, due_date: u64, companies_info: vector<u8>, escrow_bps: u64, discount_bps: u64, treasury: &mut Treasury, payment: Coin<SUI>, _cap: &SupplierCap, ctx: &mut TxContext)
+      // The function expects 9 parameters (ctx is implicit in SDK)
+      
+      // Treasury fee for issuing invoice (50 MIST = 0.00000005 SUI)
+      const treasuryFeeInMist = 50;
+      console.log("💵 Treasury fee:", treasuryFeeInMist, "MIST");
+
+      // Split coin for treasury payment
+      const [treasuryPayment] = txb.splitCoins(txb.gas, [txb.pure(treasuryFeeInMist)]);
       
       // Build arguments array with explicit typing for debugging
       const moveCallArgs = [
@@ -301,14 +323,15 @@ export function useInvoiceContract() {
         txb.pure(companiesInfoBytes), // 4. companies_info: vector<u8>
         txb.pure(escrowBps), // 5. escrow_bps: u64
         txb.pure(discountBps), // 6. discount_bps: u64
-        txb.pure(feeBps), // 7. fee_bps: u64
-        txb.object(supplierCapId), // 8. _cap: &SupplierCap (immutable reference)
+        txb.object(treasuryId), // 7. treasury: &mut Treasury (shared object)
+        treasuryPayment, // 8. payment: Coin<SUI>
+        txb.object(supplierCapId), // 9. _cap: &SupplierCap (immutable reference)
       ];
       
       console.log("🔧 Building moveCall:");
       console.log("  - Target:", moveCallTarget);
       console.log("  - Number of arguments:", moveCallArgs.length);
-      console.log("  - Expected: 8");
+      console.log("  - Expected: 9");
       
       txb.moveCall({
         target: moveCallTarget,
@@ -378,6 +401,24 @@ export function useInvoiceContract() {
           localStorage.setItem('invoice_ids', JSON.stringify(stored));
           console.log("✅ Invoice ID tracked in localStorage:", invoiceId);
         }
+
+        // Also track the escrow ID that was created with this invoice
+        const escrowChange = result.objectChanges?.find(
+          (change: any) => change.type === 'created' && change.objectType?.includes('BuyerEscrow')
+        );
+        
+        if (escrowChange && 'objectId' in escrowChange) {
+          const escrowId = (escrowChange as any).objectId;
+          console.log("💰 BuyerEscrow Object ID:", escrowId);
+          
+          // Store escrow ID mapped to invoice ID
+          const storedEscrowIds = localStorage.getItem('escrow_ids')
+            ? JSON.parse(localStorage.getItem('escrow_ids') || '{}')
+            : {};
+          storedEscrowIds[invoiceId] = escrowId;
+          localStorage.setItem('escrow_ids', JSON.stringify(storedEscrowIds));
+          console.log("✅ Escrow ID tracked in localStorage:", escrowId);
+        }
       }
 
       console.log("✅ Invoice creation completed successfully");
@@ -421,15 +462,18 @@ export function useInvoiceContract() {
     discountRate: number,
     daysUntilDue: number
   ): FinanceCalculation => {
-    // Origination fee: 1% of invoice face value (charged upfront)
-    const originationFeeRate = 1.0;
-    const originationFee = invoiceAmount * (originationFeeRate / 100);
+    // Note: Smart contract does NOT charge origination fee currently
+    // The contract has a TODO: "consider the fee as well"
+    // For now, we match the actual smart contract logic
+    const originationFeeRate = 0; // Not implemented in smart contract
+    const originationFee = 0;
 
-    // Discount amount based on user's chosen rate
+    // Discount amount based on the invoice's discount rate
     const discountAmount = invoiceAmount * (discountRate / 100);
 
-    // Investor pays: face value - discount - origination fee
-    const investorPays = invoiceAmount - discountAmount - originationFee;
+    // Investor pays: face value - discount (matching smart contract logic)
+    // Smart contract formula: expected_payment_amount = invoice::amount(invoice) - discount_amount
+    const investorPays = invoiceAmount - discountAmount;
 
     // Supplier receives: what investor pays (immediately)
     const supplierReceives = investorPays;
@@ -518,32 +562,62 @@ export function useInvoiceContract() {
       console.log(`  - Payment Amount: ${paymentAmount} SUI (${paymentInMist} MIST)`);
 
       // Query for the buyer escrow object associated with this invoice
-      console.log("🔍 Querying for BuyerEscrow object...");
+      console.log("🔍 Finding BuyerEscrow object for invoice:", invoiceId);
       
-      const escrowType = `${packageId}::escrow::BuyerEscrow`;
-      const escrowObjects = await suiClient.getOwnedObjects({
-        owner: currentAccount.address,
-        filter: {
-          StructType: escrowType,
-        },
-        options: {
-          showContent: true,
-        },
-      });
-
-      console.log(`Found ${escrowObjects.data.length} escrow objects`);
-
-      // Find the escrow for this specific invoice
       let buyerEscrowId: string | null = null;
-      
-      for (const obj of escrowObjects.data) {
-        if (obj.data?.content && 'fields' in obj.data.content) {
-          const fields = obj.data.content.fields as any;
-          if (fields.invoice_id === invoiceId) {
-            buyerEscrowId = obj.data.objectId;
-            console.log("✅ Found matching escrow:", buyerEscrowId);
-            break;
+
+      // First, try to get from localStorage (stored when invoice was created)
+      const storedEscrowIds = localStorage.getItem('escrow_ids')
+        ? JSON.parse(localStorage.getItem('escrow_ids') || '{}')
+        : {};
+
+      if (storedEscrowIds[invoiceId]) {
+        buyerEscrowId = storedEscrowIds[invoiceId];
+        console.log("✅ Found escrow ID in localStorage:", buyerEscrowId);
+      } else {
+        console.log("⚠️ Escrow ID not in localStorage, querying blockchain...");
+
+        // Query the invoice object to get its transaction digest
+        try {
+          const invoiceObj = await suiClient.getObject({
+            id: invoiceId,
+            options: {
+              showPreviousTransaction: true,
+            },
+          });
+
+          if (invoiceObj.data?.previousTransaction) {
+            const txDigest = invoiceObj.data.previousTransaction;
+            console.log("📜 Invoice transaction digest:", txDigest);
+
+            // Get the transaction details to find all created objects
+            const txDetails = await suiClient.getTransactionBlock({
+              digest: txDigest,
+              options: {
+                showObjectChanges: true,
+              },
+            });
+
+            console.log("📦 Transaction object changes:", txDetails.objectChanges);
+
+            // Find the BuyerEscrow object in the created objects
+            const escrowObject = txDetails.objectChanges?.find(
+              (change: any) =>
+                change.type === "created" &&
+                change.objectType?.includes("BuyerEscrow")
+            );
+
+            if (escrowObject && "objectId" in escrowObject) {
+              buyerEscrowId = (escrowObject as any).objectId;
+              console.log("✅ Found escrow object from transaction:", buyerEscrowId);
+              
+              // Store it for next time
+              storedEscrowIds[invoiceId] = buyerEscrowId;
+              localStorage.setItem('escrow_ids', JSON.stringify(storedEscrowIds));
+            }
           }
+        } catch (queryError) {
+          console.error("Error querying invoice/transaction:", queryError);
         }
       }
 
@@ -551,7 +625,7 @@ export function useInvoiceContract() {
         console.error("❌ BuyerEscrow not found for this invoice");
         toast({
           title: "Escrow Not Found",
-          description: "The buyer escrow for this invoice was not found. The buyer may not have paid yet.",
+          description: "The buyer escrow for this invoice was not found. The buyer may not have paid the escrow yet.",
           variant: "destructive",
         });
         console.groupEnd();
@@ -589,6 +663,31 @@ export function useInvoiceContract() {
       console.log("✅ Transaction result:", result);
 
       if (result.effects?.status?.status === "success") {
+        // Extract and track the created Funding object ID
+        if (result.objectChanges) {
+          const fundingObject = result.objectChanges.find(
+            (change: any) => 
+              change.type === "created" && 
+              change.objectType?.includes("Funding")
+          );
+          
+          if (fundingObject && "objectId" in fundingObject) {
+            const fundingId = (fundingObject as any).objectId;
+            console.log("💰 Created Funding object:", fundingId);
+            
+            // Track Funding ID in localStorage
+            const storedFundingIds = localStorage.getItem('funding_ids')
+              ? JSON.parse(localStorage.getItem('funding_ids') || '[]')
+              : [];
+            
+            if (!storedFundingIds.includes(fundingId)) {
+              storedFundingIds.push(fundingId);
+              localStorage.setItem('funding_ids', JSON.stringify(storedFundingIds));
+              console.log("✅ Funding ID tracked in localStorage");
+            }
+          }
+        }
+
         toast({
           title: "Invoice Financed Successfully",
           description: `You have successfully financed the invoice for ${paymentAmount.toFixed(4)} SUI`,

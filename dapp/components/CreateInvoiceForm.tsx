@@ -107,6 +107,33 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
       return;
     }
     
+    // Get discount and escrow percentages from form
+    const discountPercent = Number(formData.get("discount") || "5");
+    const escrowPercent = Number(formData.get("escrow") || "10");
+    
+    // Validate discount and escrow percentages
+    if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 20) {
+      alert("Discount rate must be between 0% and 20%");
+      console.error("❌ Invalid discount rate:", discountPercent);
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (isNaN(escrowPercent) || escrowPercent < 0 || escrowPercent > 50) {
+      alert("Escrow requirement must be between 0% and 50%");
+      console.error("❌ Invalid escrow percentage:", escrowPercent);
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Convert percentages to basis points (1% = 100 BPS, 100% = 10000 BPS)
+    const discountBps = Math.round(discountPercent * 100);
+    const escrowBps = Math.round(escrowPercent * 100);
+    
+    console.log("💹 Rate conversions:");
+    console.log("  - Discount:", discountPercent, "% =", discountBps, "BPS");
+    console.log("  - Escrow:", escrowPercent, "% =", escrowBps, "BPS");
+    
     const invoiceData = {
       invoiceNumber: invoiceNumber.trim(),
       buyerAddress: buyerAddress.trim(),
@@ -116,9 +143,9 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
         invoiceNumber: invoiceNumber.trim(),
         description: (formData.get("description") as string || "").trim(),
       }),
-      discountBps: 500, // 5% default
-      feeBps: 100, // 1% default
-      escrowBps: 1000, // 10% default
+      discountBps: discountBps,
+      feeBps: 100, // 1% platform fee (hardcoded for now)
+      escrowBps: escrowBps,
     };
 
     console.log("📋 Form Data Collected:", invoiceData);
@@ -217,19 +244,41 @@ const CreateInvoiceForm = ({ onSuccess }: CreateInvoiceFormProps) => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="discount">Desired Discount (%)</Label>
-            <Input
-              id="discount"
-              name="discount"
-              type="number"
-              placeholder="5"
-              step="0.1"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              Lower discount rates increase chances of faster financing
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="discount">Discount Rate (%)</Label>
+              <Input
+                id="discount"
+                name="discount"
+                type="number"
+                placeholder="5"
+                step="0.1"
+                min="0"
+                max="20"
+                defaultValue="5"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Discount offered to investors (e.g., 5% = investor pays 95% of face value)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="escrow">Escrow Requirement (%)</Label>
+              <Input
+                id="escrow"
+                name="escrow"
+                type="number"
+                placeholder="10"
+                step="1"
+                min="0"
+                max="50"
+                defaultValue="10"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Buyer must deposit this % as collateral (e.g., 10% of invoice amount)
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

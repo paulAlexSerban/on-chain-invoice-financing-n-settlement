@@ -614,34 +614,31 @@ export function useMyPayableInvoices() {
     console.log("Package ID:", packageId);
 
     try {
-      // Get all InvoiceCreated events
-      const events = await suiClient.queryEvents({
-        query: {
-          MoveEventType: `${packageId}::invoice_factory::InvoiceCreated`,
-        },
-        limit: 100,
-        order: "descending",
-      });
+      // Since contract doesn't emit events, use localStorage tracking
+      // Get all tracked invoice IDs
+      let invoiceIds: string[] = [];
+      
+      try {
+        const storedInvoiceIds = localStorage.getItem('invoice_ids')
+          ? JSON.parse(localStorage.getItem('invoice_ids') || '[]')
+          : [];
 
-      console.log("Total InvoiceCreated events found:", events.data.length);
+        console.log("📦 Stored invoice IDs from localStorage:", storedInvoiceIds);
+        invoiceIds = storedInvoiceIds;
 
-      // Filter events where buyer is the current user
-      const myBuyerEvents = events.data.filter((event) => {
-        const parsedJson = event.parsedJson as any;
-        return parsedJson?.buyer === currentAccount.address;
-      });
+        if (invoiceIds.length === 0) {
+          console.warn("⚠️ No invoice IDs tracked in localStorage.");
+          console.warn("💡 Create an invoice first to see it here.");
+          console.groupEnd();
+          return [];
+        }
+      } catch (storageError) {
+        console.error("Error reading from localStorage:", storageError);
+        console.groupEnd();
+        return [];
+      }
 
-      console.log("Events where I am the buyer:", myBuyerEvents.length);
-
-      // Extract invoice IDs
-      const invoiceIds = myBuyerEvents
-        .map((event) => {
-          const parsedJson = event.parsedJson as any;
-          return parsedJson?.invoice_id;
-        })
-        .filter(Boolean);
-
-      console.log("Invoice IDs:", invoiceIds);
+      console.log("Found invoice IDs:", invoiceIds.length);
 
       // Fetch each invoice object
       const invoiceObjects = await Promise.all(
@@ -665,7 +662,7 @@ export function useMyPayableInvoices() {
       console.log("Successfully fetched objects:", invoiceObjects.filter(o => o !== null).length);
 
       // Parse invoice data
-      const invoices = invoiceObjects
+      const allInvoices = invoiceObjects
         .filter(
           (obj): obj is NonNullable<typeof obj> =>
             obj !== null && obj.data?.content !== undefined
@@ -698,6 +695,17 @@ export function useMyPayableInvoices() {
             }
           }
 
+          const escrowBpsRaw = fields.escrow_bps;
+          const escrowBpsParsed = escrowBpsRaw !== undefined ? parseInt(escrowBpsRaw) : 0;
+          
+          console.log(`📊 Invoice ${companiesInfo.invoiceNumber || obj.data!.objectId.slice(0, 8)} BPS values:`, {
+            escrow_bps_raw: escrowBpsRaw,
+            escrow_bps_parsed: escrowBpsParsed,
+            discount_bps_raw: fields.discount_bps,
+            discount_bps_parsed: fields.discount_bps !== undefined ? parseInt(fields.discount_bps) : 0,
+            fee_bps_raw: fields.fee_bps,
+          });
+          
           const invoice: OnChainInvoice = {
             id: obj.data!.objectId,
             invoiceNumber: companiesInfo.invoiceNumber || "N/A",
@@ -718,7 +726,7 @@ export function useMyPayableInvoices() {
             originationFeeCollected: originationFee,
             originationFeeCollectedInSui: originationFee ? formatSuiAmount(originationFee) : undefined,
             discountRateBps: fields.discount_bps?.toString() || "0",
-            escrowBps: fields.escrow_bps !== undefined ? parseInt(fields.escrow_bps) : 0,
+            escrowBps: escrowBpsParsed,
             discountBps: fields.discount_bps !== undefined ? parseInt(fields.discount_bps) : 0,
             feeBps: fields.fee_bps !== undefined ? parseInt(fields.fee_bps) : 0,
             companiesInfo: companiesInfoStr,
@@ -727,7 +735,17 @@ export function useMyPayableInvoices() {
           return invoice;
         });
 
-      console.log("My payable invoices:", invoices.length);
+      // Filter to only invoices where current user is the buyer
+      const invoices = allInvoices.filter(invoice => {
+        const isBuyer = invoice.buyer.toLowerCase() === currentAccount.address.toLowerCase();
+        if (isBuyer) {
+          console.log(`✅ Invoice ${invoice.invoiceNumber} - I am the buyer`);
+        }
+        return isBuyer;
+      });
+
+      console.log("Total fetched invoices:", allInvoices.length);
+      console.log("My payable invoices (where I'm buyer):", invoices.length);
       console.log("Status breakdown:", {
         created: invoices.filter(i => i.status === InvoiceStatus.CREATED).length,
         ready: invoices.filter(i => i.status === InvoiceStatus.READY).length,

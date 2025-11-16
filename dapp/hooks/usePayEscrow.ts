@@ -135,63 +135,79 @@ export function usePayEscrow() {
 
   // Function to find the escrow object for an invoice
   const findEscrowObject = async (invoiceId: string): Promise<string | null> => {
-    if (!packageId) return null;
+    if (!packageId || !currentAccount) return null;
 
     try {
       console.log("🔍 Finding escrow object for invoice:", invoiceId);
 
-      // Query for BuyerEscrow objects
-      // We need to find the escrow that matches this invoice_id
-      const escrowType = `${packageId}::escrow::BuyerEscrow`;
+      // BuyerEscrow is a shared object, so we need to query it
+      // Since it's created in the same transaction as the invoice,
+      // we can check localStorage for the escrow ID or query the invoice object
+      
+      // First, try to get from localStorage (stored when invoice was created)
+      const storedEscrowIds = localStorage.getItem('escrow_ids')
+        ? JSON.parse(localStorage.getItem('escrow_ids') || '{}')
+        : {};
 
-      // Get all BuyerEscrow objects (they are shared objects)
-      // We'll need to query events to find the right one
-      const events = await suiClient.queryEvents({
-        query: {
-          MoveEventType: `${packageId}::invoice_factory::InvoiceCreated`,
-        },
-        limit: 100,
-        order: "descending",
-      });
+      if (storedEscrowIds[invoiceId]) {
+        console.log("✅ Found escrow ID in localStorage:", storedEscrowIds[invoiceId]);
+        return storedEscrowIds[invoiceId];
+      }
 
-      // Find the event for this invoice
-      const invoiceEvent = events.data.find((event) => {
-        const parsedJson = event.parsedJson as any;
-        return parsedJson?.invoice_id === invoiceId;
-      });
+      console.log("⚠️ Escrow ID not in localStorage, querying blockchain...");
 
-      if (!invoiceEvent) {
-        console.warn("⚠️ Invoice event not found");
+      // Alternative: Query the invoice object to get its transaction digest
+      // Then get the transaction details to find the escrow object
+      try {
+        const invoiceObj = await suiClient.getObject({
+          id: invoiceId,
+          options: {
+            showPreviousTransaction: true,
+          },
+        });
+
+        if (!invoiceObj.data?.previousTransaction) {
+          console.warn("⚠️ Could not get invoice transaction digest");
+          return null;
+        }
+
+        const txDigest = invoiceObj.data.previousTransaction;
+        console.log("📜 Invoice transaction digest:", txDigest);
+
+        // Get the transaction details to find all created objects
+        const txDetails = await suiClient.getTransactionBlock({
+          digest: txDigest,
+          options: {
+            showObjectChanges: true,
+          },
+        });
+
+        console.log("📦 Transaction object changes:", txDetails.objectChanges);
+
+        // Find the BuyerEscrow object in the created objects
+        const escrowObject = txDetails.objectChanges?.find(
+          (change: any) =>
+            change.type === "created" &&
+            change.objectType?.includes("BuyerEscrow")
+        );
+
+        if (escrowObject && "objectId" in escrowObject) {
+          const escrowId = (escrowObject as any).objectId;
+          console.log("✅ Found escrow object from transaction:", escrowId);
+          
+          // Store it for next time
+          storedEscrowIds[invoiceId] = escrowId;
+          localStorage.setItem('escrow_ids', JSON.stringify(storedEscrowIds));
+          
+          return escrowId;
+        }
+
+        console.warn("⚠️ BuyerEscrow not found in transaction object changes");
+        return null;
+      } catch (queryError) {
+        console.error("Error querying invoice/transaction:", queryError);
         return null;
       }
-
-      // The escrow object is created in the same transaction as the invoice
-      // We need to get the transaction details to find the escrow object ID
-      const txDigest = invoiceEvent.id.txDigest;
-      console.log("Transaction digest:", txDigest);
-
-      const txDetails = await suiClient.getTransactionBlock({
-        digest: txDigest,
-        options: {
-          showObjectChanges: true,
-        },
-      });
-
-      // Find the BuyerEscrow object in the transaction's created objects
-      const escrowObject = txDetails.objectChanges?.find(
-        (change: any) =>
-          change.type === "created" &&
-          change.objectType?.includes("BuyerEscrow")
-      );
-
-      if (escrowObject && "objectId" in escrowObject) {
-        const escrowId = (escrowObject as any).objectId;
-        console.log("✅ Found escrow object:", escrowId);
-        return escrowId;
-      }
-
-      console.warn("⚠️ Escrow object not found in transaction");
-      return null;
     } catch (error) {
       console.error("Error finding escrow object:", error);
       return null;

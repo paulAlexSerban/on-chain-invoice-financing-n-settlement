@@ -220,6 +220,88 @@ export function DebugPanel() {
             </div>
           </div>
 
+          {/* LocalStorage Status */}
+          <div className="space-y-2">
+            <p className="font-semibold text-base">LocalStorage Data</p>
+            <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Invoice IDs:</span>
+                <Badge variant="outline" className="text-xs">
+                  {(() => {
+                    try {
+                      const stored = localStorage.getItem('invoice_ids');
+                      const ids = stored ? JSON.parse(stored) : [];
+                      return Array.isArray(ids) ? ids.length : 0;
+                    } catch {
+                      return 0;
+                    }
+                  })()} tracked
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Escrow IDs:</span>
+                <Badge variant="outline" className="text-xs">
+                  {(() => {
+                    try {
+                      const stored = localStorage.getItem('escrow_ids');
+                      const ids = stored ? JSON.parse(stored) : {};
+                      return Object.keys(ids).length;
+                    } catch {
+                      return 0;
+                    }
+                  })()} tracked
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Funding IDs:</span>
+                <Badge variant="outline" className="text-xs">
+                  {(() => {
+                    try {
+                      const stored = localStorage.getItem('funding_ids');
+                      const ids = stored ? JSON.parse(stored) : [];
+                      return Array.isArray(ids) ? ids.length : 0;
+                    } catch {
+                      return 0;
+                    }
+                  })()} tracked
+                </Badge>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2 text-xs"
+                onClick={() => {
+                  const invoices = localStorage.getItem('invoice_ids');
+                  const escrows = localStorage.getItem('escrow_ids');
+                  const fundings = localStorage.getItem('funding_ids');
+                  console.log('📦 LocalStorage Dump:');
+                  console.log('Invoice IDs:', invoices ? JSON.parse(invoices) : []);
+                  console.log('Escrow IDs:', escrows ? JSON.parse(escrows) : {});
+                  console.log('Funding IDs:', fundings ? JSON.parse(fundings) : []);
+                  alert('LocalStorage data logged to console (F12)');
+                }}
+              >
+                View Full Data in Console
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  if (confirm('Clear all localStorage data? This cannot be undone.')) {
+                    localStorage.removeItem('invoice_ids');
+                    localStorage.removeItem('escrow_ids');
+                    localStorage.removeItem('funding_ids');
+                    localStorage.removeItem('supplier_cap_id');
+                    alert('LocalStorage cleared! Refresh the page.');
+                  }
+                }}
+              >
+                Clear All Data
+              </Button>
+            </div>
+          </div>
+
           {/* Debug Tips */}
           <div className="pt-3 border-t space-y-2">
             <p className="text-xs font-medium">💡 Debug Tips:</p>
@@ -228,6 +310,7 @@ export function DebugPanel() {
               <li>All transactions are logged with step-by-step details</li>
               <li>Click <ExternalLink className="h-3 w-3 inline" /> to view on explorer</li>
               <li>Need testnet SUI? Visit Discord #testnet-faucet</li>
+              <li>If invoices don't appear, check localStorage tracking</li>
             </ul>
           </div>
 

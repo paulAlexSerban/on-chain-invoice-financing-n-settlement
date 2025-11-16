@@ -230,12 +230,29 @@ export function useInvoiceOperations() {
       // Default BPS values
       const escrowBps = params.escrow_bps || 1000;
       const discountBps = params.discount_bps || 320;
-      const feeBps = params.fee_bps || 50;
+      
+      // Treasury fee for issuing invoice (small fixed fee)
+      const treasuryFeeInMist = 50; // 0.00000005 SUI
 
       console.log('💰 Amount:', params.amount, 'SUI →', amountInMist.toString(), 'MIST');
       console.log('📅 Due date:', params.due_date, '→', dueDateTimestamp, 'seconds');
       console.log('👤 Buyer:', buyerAddress);
-      console.log('📊 BPS: escrow=', escrowBps, 'discount=', discountBps, 'fee=', feeBps);
+      console.log('📊 BPS: escrow=', escrowBps, 'discount=', discountBps);
+      console.log('💵 Treasury fee:', treasuryFeeInMist, 'MIST');
+
+      // Check Treasury ID is configured
+      if (!CONTRACT_ADDRESSES.TREASURY_ID) {
+        toast({
+          title: 'Configuration Error',
+          description: 'Treasury ID not configured. Please check .env',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return null;
+      }
+
+      // Split coin for treasury payment
+      const [treasuryPayment] = txb.splitCoins(txb.gas, [txb.pure(treasuryFeeInMist)]);
 
       txb.moveCall({
         target: buildMoveCallTarget(MODULES.INVOICE_FACTORY, FUNCTIONS.ISSUE_INVOICE) as `${string}::${string}::${string}`,
@@ -246,8 +263,9 @@ export function useInvoiceOperations() {
           txb.pure(companiesInfoBytes, 'vector<u8>'),
           txb.pure(escrowBps, 'u64'),
           txb.pure(discountBps, 'u64'),
-          txb.pure(feeBps, 'u64'),
-          txb.object(supplierCapId),
+          txb.object(CONTRACT_ADDRESSES.TREASURY_ID),  // Treasury shared object
+          treasuryPayment,                              // Payment coin
+          txb.object(supplierCapId),                    // SupplierCap
         ],
       });
 
@@ -295,6 +313,16 @@ export function useInvoiceOperations() {
         if (!stored.includes(invoiceId)) {
           stored.push(invoiceId);
           localStorage.setItem('invoice_ids', JSON.stringify(stored));
+        }
+
+        // Track escrow ID mapped to invoice ID
+        if (escrowId) {
+          const storedEscrowIds = localStorage.getItem('escrow_ids')
+            ? JSON.parse(localStorage.getItem('escrow_ids') || '{}')
+            : {};
+          storedEscrowIds[invoiceId] = escrowId;
+          localStorage.setItem('escrow_ids', JSON.stringify(storedEscrowIds));
+          console.log('✅ Escrow ID tracked in localStorage:', escrowId);
         }
       }
 

@@ -7,7 +7,9 @@ import { toast } from "@/hooks/use-toast";
 
 export interface SettleInvoiceParams {
   invoiceId: string;
-  amount: number; // in SUI
+  escrowId: string;
+  fundingId: string;
+  totalPayment: number; // in SUI (includes invoice amount + discount)
 }
 
 export function useSettleInvoice() {
@@ -20,9 +22,14 @@ export function useSettleInvoice() {
   const [error, setError] = useState<string | null>(null);
 
   const packageId = process.env.NEXT_PUBLIC_CONTRACT_ID;
-  const platformId = process.env.NEXT_PUBLIC_PLATFORM_ID;
+  const treasuryId = process.env.NEXT_PUBLIC_TREASURY_ID;
 
-  const settleInvoice = async ({ invoiceId, amount }: SettleInvoiceParams) => {
+  const settleInvoice = async ({ 
+    invoiceId, 
+    escrowId, 
+    fundingId, 
+    totalPayment 
+  }: SettleInvoiceParams) => {
     if (!currentAccount) {
       const errorMsg = "Please connect your wallet first";
       setError(errorMsg);
@@ -34,8 +41,8 @@ export function useSettleInvoice() {
       return { success: false, error: errorMsg };
     }
 
-    if (!packageId || !platformId) {
-      const errorMsg = "Environment not configured properly";
+    if (!packageId || !treasuryId) {
+      const errorMsg = "Environment not configured properly. Missing Contract ID or Treasury ID.";
       setError(errorMsg);
       toast({
         title: "Configuration error",
@@ -50,23 +57,33 @@ export function useSettleInvoice() {
 
     try {
       console.log("🔄 Settling invoice:", invoiceId);
-      console.log("Amount:", amount, "SUI");
+      console.log("Total payment:", totalPayment, "SUI");
 
       // Convert SUI to MIST
-      const amountInMist = Math.floor(amount * 1_000_000_000);
+      const totalPaymentInMist = Math.floor(totalPayment * 1_000_000_000);
 
       const tx = new TransactionBlock();
 
       // Split coins for payment
-      const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure(amountInMist, "u64")]);
+      const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure(totalPaymentInMist, "u64")]);
 
-      // Call repay_invoice
+      // Call pay_invoice (pay_invoice module)
+      // entry fun pay_invoice(
+      //     invoice: &mut Invoice,
+      //     buyer_escrow: &mut BuyerEscrow,
+      //     funding: &Funding,
+      //     treasury: &mut Treasury,
+      //     mut payment: Coin<SUI>,
+      //     ctx: &mut TxContext
+      // )
       tx.moveCall({
-        target: `${packageId}::invoice_financing::repay_invoice`,
+        target: `${packageId}::pay_invoice::pay_invoice`,
         arguments: [
-          tx.object(platformId), // platform
-          tx.object(invoiceId),  // invoice
-          paymentCoin,           // payment
+          tx.object(invoiceId),    // invoice: &mut Invoice
+          tx.object(escrowId),     // buyer_escrow: &mut BuyerEscrow
+          tx.object(fundingId),    // funding: &Funding
+          tx.object(treasuryId),   // treasury: &mut Treasury
+          paymentCoin,             // payment: Coin<SUI>
         ],
       });
 
@@ -84,7 +101,7 @@ export function useSettleInvoice() {
 
       toast({
         title: "Invoice settled",
-        description: `Successfully settled invoice for ${amount.toFixed(2)} SUI`,
+        description: `Successfully settled invoice for ${totalPayment.toFixed(2)} SUI`,
       });
 
       setIsSettling(false);

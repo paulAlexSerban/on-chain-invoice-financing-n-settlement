@@ -51,76 +51,221 @@ export function useSharedInvoices(filters?: InvoiceFilters) {
       const invoiceType = `${packageId}::invoice::Invoice`;
       console.log("Invoice Type:", invoiceType);
       
-      // Query for InvoiceCreated events to discover invoices
-      console.log("📡 Querying InvoiceCreated events...");
+      // Query all shared Invoice objects by type
+      console.log("📡 Querying all Invoice objects by type...");
 
-      let storedInvoiceIds: string[] = [];
+      let invoiceObjects: any[] = [];
 
       try {
-        const events = await suiClient.queryEvents({
-          query: {
-            MoveEventType: `${packageId}::invoice_factory::InvoiceCreated`,
-          },
-          limit: 100,
-          order: "descending",
-        });
+        // Skip event queries - smart contract doesn't emit events
+        // Go directly to localStorage tracking
+        console.log("📦 Loading invoice IDs from localStorage...");
+        
+        let storedInvoiceIds: string[] = [];
+        try {
+          const stored = localStorage.getItem('invoice_ids');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            // Ensure it's an array and filter out invalid entries
+            storedInvoiceIds = Array.isArray(parsed) 
+              ? parsed.filter((id: any) => typeof id === 'string' && id.length > 20)
+              : [];
+          }
+        } catch (parseError) {
+          console.error("Error parsing invoice_ids from localStorage:", parseError);
+          // Clear invalid data
+          localStorage.removeItem('invoice_ids');
+          storedInvoiceIds = [];
+        }
 
-        console.log("Found InvoiceCreated events:", events.data.length);
-
-        // Extract invoice IDs from events
-        storedInvoiceIds = events.data
-          .map((event) => {
-            const parsedJson = event.parsedJson as any;
-            return parsedJson?.invoice_id;
-          })
-          .filter(Boolean);
-
-        console.log("Invoice IDs from events:", storedInvoiceIds);
+        console.log("📦 Valid invoice IDs from localStorage:", storedInvoiceIds);
 
         if (storedInvoiceIds.length === 0) {
-          console.warn("⚠️ No invoices found on blockchain yet.");
-          console.warn("⚠️ Create an invoice first to see it in the marketplace.");
+          console.warn("⚠️ No invoice IDs tracked in localStorage.");
+          console.warn("💡 Create an invoice first to see it in the marketplace.");
           console.groupEnd();
           return [];
         }
-      } catch (eventError) {
-        console.error("Error querying events, falling back to localStorage:", eventError);
 
-        // Fallback to localStorage
-        storedInvoiceIds = localStorage.getItem('invoice_ids')
-          ? JSON.parse(localStorage.getItem('invoice_ids') || '[]')
-          : [];
+        // Fetch each invoice object with better error handling
+        const fetchResults = await Promise.allSettled(
+          storedInvoiceIds.map(async (id: string) => {
+            console.log(`Fetching invoice ${id}...`);
+            
+            // Validate invoice ID format
+            if (!id || typeof id !== 'string' || id.length < 20) {
+              console.warn(`Invalid invoice ID format: ${id}`);
+              return null;
+            }
+            
+            try {
+              const obj = await suiClient.getObject({
+                id: id,
+                options: {
+                  showContent: true,
+                  showOwner: true,
+                  showType: true,
+                },
+              });
+              
+              if (!obj.data) {
+                console.warn(`No data for invoice ${id}`);
+                return null;
+              }
 
-        console.log("Stored invoice IDs:", storedInvoiceIds);
+              console.log(`✅ Fetched invoice ${id}:`, obj.data);
+              return obj;
+            } catch (error) {
+              console.error(`❌ Error fetching invoice ${id}:`, error);
+              return null;
+            }
+          })
+        );
+
+        // Extract successful results and filter out nulls
+        invoiceObjects = fetchResults
+          .filter((result): result is PromiseFulfilledResult<any> => 
+            result.status === 'fulfilled' && result.value !== null
+          )
+          .map(result => result.value);
+
+      } catch (queryError) {
+        console.error("❌ Error querying invoices:", queryError);
+        
+        // Try fallback to localStorage
+        let storedInvoiceIds: string[] = [];
+        try {
+          const stored = localStorage.getItem('invoice_ids');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            storedInvoiceIds = Array.isArray(parsed) 
+              ? parsed.filter((id: any) => typeof id === 'string' && id.length > 20)
+              : [];
+          }
+        } catch (parseError) {
+          console.error("Error parsing invoice_ids:", parseError);
+          storedInvoiceIds = [];
+        }
+
+        console.log("Fallback to stored invoice IDs:", storedInvoiceIds);
 
         if (storedInvoiceIds.length === 0) {
           console.warn("⚠️ No invoice IDs tracked.");
           console.groupEnd();
           return [];
         }
+
+        const fallbackResults = await Promise.allSettled(
+          storedInvoiceIds.map(async (id: string) => {
+            // Validate invoice ID format
+            if (!id || typeof id !== 'string' || id.length < 20) {
+              console.warn(`Invalid invoice ID format: ${id}`);
+              return null;
+            }
+            
+            try {
+              const obj = await suiClient.getObject({
+                id: id,
+                options: {
+                  showContent: true,
+                  showOwner: true,
+                  showType: true,
+                },
+              });
+              
+              if (!obj.data) {
+                console.warn(`No data for invoice ${id}`);
+                return null;
+              }
+              
+              return obj;
+            } catch (error) {
+              console.error(`Error fetching invoice ${id}:`, error);
+              return null;
+            }
+          })
+        );
+
+        invoiceObjects = fallbackResults
+          .filter((result): result is PromiseFulfilledResult<any> => 
+            result.status === 'fulfilled' && result.value !== null
+          )
+          .map(result => result.value);
       }
 
-      // Fetch each invoice object
-      const invoiceObjects = await Promise.all(
-        storedInvoiceIds.map(async (id: string) => {
-          try {
-            const obj = await suiClient.getObject({
-              id: id,
-              options: {
-                showContent: true,
-                showOwner: true,
-                showType: true,
-              },
-            });
-            return obj;
-          } catch (error) {
-            console.error(`Error fetching invoice ${id}:`, error);
-            return null;
-          }
-        })
-      );
-
       console.log("Fetched objects:", invoiceObjects.length);
+
+      // For financed invoices, fetch the Funding objects to get investor address
+      console.log("🔍 Fetching Funding objects for financed invoices...");
+      const fundingType = `${packageId}::invoice_financing::Funding`;
+      
+      // Map of invoice ID -> funder address
+      const fundingMap: Record<string, string> = {};
+      
+      // Query all Funding objects (they are shared objects)
+      // We need to track Funding IDs similar to how we track invoice IDs
+      try {
+        // Try to get funding IDs from localStorage first
+        let storedFundingIds: string[] = [];
+        try {
+          const stored = localStorage.getItem('funding_ids');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            storedFundingIds = Array.isArray(parsed) 
+              ? parsed.filter((id: any) => typeof id === 'string' && id.length > 20)
+              : [];
+          }
+        } catch (parseError) {
+          console.error("Error parsing funding_ids from localStorage:", parseError);
+          storedFundingIds = [];
+        }
+
+        console.log(`📦 Found ${storedFundingIds.length} Funding IDs in localStorage`);
+
+        // Fetch each Funding object
+        const fundingResults = await Promise.allSettled(
+          storedFundingIds.map(async (id: string) => {
+            try {
+              const obj = await suiClient.getObject({
+                id: id,
+                options: {
+                  showContent: true,
+                  showType: true,
+                },
+              });
+              
+              if (!obj.data) return null;
+              return obj;
+            } catch (error) {
+              console.error(`Error fetching Funding ${id}:`, error);
+              return null;
+            }
+          })
+        );
+
+        const fundingObjects = fundingResults
+          .filter((result): result is PromiseFulfilledResult<any> => 
+            result.status === 'fulfilled' && result.value !== null
+          )
+          .map(result => result.value);
+
+        console.log(`✅ Fetched ${fundingObjects.length} Funding objects`);
+        
+        // Build map of invoice_id -> funder
+        for (const fundingObj of fundingObjects) {
+          const fundingContent = fundingObj.data?.content as any;
+          if (fundingContent?.fields) {
+            const invoiceId = fundingContent.fields.invoice_id;
+            const funder = fundingContent.fields.funder;
+            if (invoiceId && funder) {
+              fundingMap[invoiceId] = funder;
+              console.log(`💰 Funding: Invoice ${invoiceId.slice(0, 8)}... funded by ${funder.slice(0, 8)}...`);
+            }
+          }
+        }
+      } catch (fundingError) {
+        console.warn("Could not query Funding objects:", fundingError);
+      }
 
       // Parse invoice data from actual Invoice struct
       const invoices: OnChainInvoice[] = invoiceObjects
@@ -131,6 +276,23 @@ export function useSharedInvoices(filters?: InvoiceFilters) {
         .map((obj) => {
           const content = obj.data!.content as any;
           const fields = content.fields;
+
+          // Helper to extract Option<T> values from Move
+          // Move Option is represented as {vec: [value]} or {vec: []}
+          const extractOption = (optionField: any) => {
+            if (!optionField || !optionField.vec) return undefined;
+            return optionField.vec.length > 0 ? optionField.vec[0] : undefined;
+          };
+
+          // Get investor from Funding object (not from Invoice struct)
+          const invoiceId = obj.data!.objectId;
+          const investor = fundingMap[invoiceId]; // Get from Funding map
+          
+          // These fields don't exist in current Invoice struct
+          // Keeping the code in case they're added later
+          const investorPaid = extractOption(fields.investor_paid);
+          const supplierReceived = extractOption(fields.supplier_received);
+          const originationFee = extractOption(fields.origination_fee);
 
           // Parse companies_info (JSON string)
           let companiesInfoStr = "";
@@ -164,6 +326,15 @@ export function useSharedInvoices(filters?: InvoiceFilters) {
             invoiceNumber: companiesInfo.invoiceNumber || "N/A",
             description: companiesInfo.description || "",
             issuer: fields.supplier || "", // supplier is the issuer
+            // Extract Option fields for financing info
+            financedBy: investor,
+            investorPaid: investorPaid,
+            investorPaidInSui: investorPaid ? formatSuiAmount(investorPaid) : undefined,
+            supplierReceived: supplierReceived,
+            supplierReceivedInSui: supplierReceived ? formatSuiAmount(supplierReceived) : undefined,
+            originationFeeCollected: originationFee,
+            originationFeeCollectedInSui: originationFee ? formatSuiAmount(originationFee) : undefined,
+            discountRateBps: fields.discount_bps?.toString() || "0",
           };
 
           return invoice;
@@ -262,6 +433,22 @@ export function trackInvoiceId(invoiceId: string) {
     stored.push(invoiceId);
     localStorage.setItem('invoice_ids', JSON.stringify(stored));
     console.log("✅ Invoice ID tracked:", invoiceId);
+  }
+}
+
+/**
+ * Helper function to add funding ID to tracking
+ * Call this after financing an invoice
+ */
+export function trackFundingId(fundingId: string) {
+  const stored = localStorage.getItem('funding_ids') 
+    ? JSON.parse(localStorage.getItem('funding_ids') || '[]')
+    : [];
+  
+  if (!stored.includes(fundingId)) {
+    stored.push(fundingId);
+    localStorage.setItem('funding_ids', JSON.stringify(stored));
+    console.log("✅ Funding ID tracked:", fundingId);
   }
 }
 

@@ -32,43 +32,32 @@ export function FinanceInvoiceModal({
   onSuccess,
 }: FinanceInvoiceModalProps) {
   const { financeInvoice, calculateFinancing, isLoading } = useInvoiceContract();
-  const [discountRate, setDiscountRate] = useState<string>("2.0"); // Default 2%
   const [calculation, setCalculation] = useState<FinanceCalculation | null>(null);
 
   if (!invoice) return null;
 
+  // Get discount rate from invoice object (discount_bps / 100 = percentage)
+  // Example: 320 BPS = 3.2%
+  const discountRate = (invoice.discountBps || 0) / 100;
+
   // Calculate days until due
   const daysUntilDue = Math.ceil((invoice.dueDate - Date.now()) / (1000 * 60 * 60 * 24));
 
-  // Update calculation when discount rate changes
-  const handleDiscountRateChange = (value: string) => {
-    setDiscountRate(value);
-    const rate = parseFloat(value);
-    if (!isNaN(rate) && rate >= 0 && rate <= 50) {
-      const calc = calculateFinancing(invoice.amountInSui, rate, daysUntilDue);
-      setCalculation(calc);
-    }
-  };
-
-  // Initialize calculation
-  if (!calculation && discountRate) {
-    const rate = parseFloat(discountRate);
-    if (!isNaN(rate)) {
-      const calc = calculateFinancing(invoice.amountInSui, rate, daysUntilDue);
-      setCalculation(calc);
-    }
+  // Initialize calculation when modal opens or invoice changes
+  if (!calculation && invoice) {
+    const calc = calculateFinancing(invoice.amountInSui, discountRate, daysUntilDue);
+    setCalculation(calc);
   }
 
   const handleFinance = async () => {
-    const rate = parseFloat(discountRate);
-    if (isNaN(rate) || rate <= 0 || rate > 50) {
+    if (discountRate <= 0) {
       return;
     }
 
     const result = await financeInvoice({
       invoiceId: invoice.id,
       invoiceAmount: invoice.amountInSui,
-      discountRate: rate,
+      discountRate: discountRate,
     });
 
     if (result?.success) {
@@ -106,24 +95,20 @@ export function FinanceInvoiceModal({
             </div>
           </div>
 
-          {/* Discount Rate Input */}
-          <div className="space-y-2">
-            <Label htmlFor="discountRate">
-              Discount Rate (%)
-              <span className="text-xs text-muted-foreground ml-2">
-                Your profit margin - higher rate = higher return but less attractive to supplier
-              </span>
-            </Label>
-            <Input
-              id="discountRate"
-              type="number"
-              step="0.1"
-              min="0.1"
-              max="50"
-              value={discountRate}
-              onChange={(e) => handleDiscountRateChange(e.target.value)}
-              placeholder="e.g., 2.0"
-            />
+          {/* Discount Rate Display (Set by Invoice) */}
+          <div className="rounded-lg border p-4 bg-muted/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-sm">Discount Rate</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pre-set by the supplier when creating the invoice
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-primary">{discountRate.toFixed(2)}%</div>
+                <div className="text-xs text-muted-foreground">{invoice.discountBps} BPS</div>
+              </div>
+            </div>
           </div>
 
           {calculation && (
@@ -156,16 +141,9 @@ export function FinanceInvoiceModal({
                   <div className="pl-4 space-y-1.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        - Your Discount ({calculation.discountRate}%):
+                        - Your Discount ({calculation.discountRate.toFixed(2)}%):
                       </span>
                       <span className="text-red-600">-{calculation.discountAmount.toFixed(4)} SUI</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        - Platform Origination Fee ({calculation.originationFeeRate}%):
-                      </span>
-                      <span className="text-red-600">-{calculation.originationFee.toFixed(4)} SUI</span>
                     </div>
                   </div>
 
@@ -278,7 +256,7 @@ export function FinanceInvoiceModal({
               isLoading ||
               !calculation ||
               calculation.expectedAPY < 0 ||
-              parseFloat(discountRate) <= 0
+              discountRate <= 0
             }
           >
             {isLoading ? (

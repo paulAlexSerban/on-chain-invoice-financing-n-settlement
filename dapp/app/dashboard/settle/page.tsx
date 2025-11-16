@@ -58,7 +58,28 @@ const SettleDashboard = () => {
     setPayingEscrowFor(invoice.id);
 
     try {
-      console.log("🔍 Finding escrow object for invoice:", invoice.id);
+      console.log("� Paying Escrow for Invoice");
+      console.log("Invoice ID:", invoice.id);
+      console.log("Invoice Amount (SUI):", invoice.amountInSui);
+      console.log("Escrow BPS:", invoice?.escrowBps);
+      
+      const escrowBps = invoice?.escrowBps || 0;
+      const escrowAmount = (invoice.amountInSui * escrowBps) / 10000;
+      
+      console.log("Calculated Escrow Amount:", escrowAmount, "SUI");
+      console.log("Calculation:", `${invoice.amountInSui} * ${escrowBps} / 10000 = ${escrowAmount}`);
+      
+      if (escrowAmount === 0) {
+        toast({
+          title: "Invalid Escrow Amount",
+          description: `Escrow BPS is ${escrowBps}. The invoice might not have escrow configured properly.`,
+          variant: "destructive",
+        });
+        setPayingEscrowFor(null);
+        return;
+      }
+      
+      console.log("�🔍 Finding escrow object for invoice:", invoice.id);
       const escrowObjectId = await findEscrowObject(invoice.id);
 
       if (!escrowObjectId) {
@@ -72,8 +93,6 @@ const SettleDashboard = () => {
       }
 
       console.log("✅ Found escrow object:", escrowObjectId);
-
-      const escrowAmount = (invoice.amountInSui * (invoice?.escrowBps || 0)) / 10000;
 
       const result = await payEscrow(invoice.id, escrowObjectId, escrowAmount);
 
@@ -381,7 +400,16 @@ const SettleDashboard = () => {
                     {pendingInvoices.map((invoice) => {
                       const daysUntilDue = getDaysUntilDue(invoice.dueDate);
                       const isOverdue = daysUntilDue < 0;
-                      const escrowAmount = (invoice.amountInSui * (invoice?.escrowBps || 0)) / 10000;
+                      const escrowBps = invoice?.escrowBps || 0;
+                      const escrowAmount = (invoice.amountInSui * escrowBps) / 10000;
+                      
+                      // Log for debugging
+                      console.log(`📋 Pending Invoice ${invoice.invoiceNumber}:`, {
+                        amountInSui: invoice.amountInSui,
+                        escrowBps: escrowBps,
+                        escrowAmount: escrowAmount,
+                        calculation: `${invoice.amountInSui} * ${escrowBps} / 10000 = ${escrowAmount}`
+                      });
 
                       return (
                         <Card key={invoice.id}>
@@ -550,6 +578,9 @@ const SettleDashboard = () => {
                 invoiceNumber: selectedInvoice.invoiceNumber,
                 amount: selectedInvoice.amountInSui,
                 dueDate: formatDate(selectedInvoice.dueDate),
+                discountBps: selectedInvoice.discountBps,
+                buyer: selectedInvoice.buyer,
+                financedBy: selectedInvoice.financedBy,
               }}
               onSuccess={handleSettleSuccess}
             />

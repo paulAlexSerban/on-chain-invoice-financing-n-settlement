@@ -22,8 +22,9 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
     ? `https://suivision.xyz/object/${invoice.id}`
     : `https://testnet.suivision.xyz/object/${invoice.id}`;
 
-  // Calculate potential return (example: 5% discount)
-  const discountRate = 0.05;
+  // Calculate potential return using actual discount from invoice
+  // discountBps is basis points: 320 BPS = 3.2% = 0.032
+  const discountRate = (invoice.discountBps || 0) / 10000;
   const potentialReturn = invoice.amountInSui * discountRate;
 
   // Risk Indicator Logic (F8 from PRD)
@@ -104,6 +105,16 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
           </span>
         </div>
 
+        {/* Discount Rate - Only for Ready/Available invoices */}
+        {invoice.status === 1 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Discount Rate</span>
+            <span className="font-medium text-primary">
+              {((invoice.discountBps || 0) / 100).toFixed(2)}%
+            </span>
+          </div>
+        )}
+
         {/* Potential Return - Only for Ready/Available invoices */}
         {invoice.status === 1 && (
           <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-md">
@@ -112,7 +123,7 @@ export function BlockchainInvoiceCard({ invoice, onFinance, onViewDetails }: Blo
               <span className="text-sm font-medium">Est. Return</span>
             </div>
             <span className="font-bold text-green-700 dark:text-green-400">
-              ~{potentialReturn.toFixed(2)} SUI
+              ~{potentialReturn.toFixed(4)} SUI
             </span>
           </div>
         )}

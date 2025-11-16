@@ -12,19 +12,19 @@ import { useWalletKit } from "@mysten/wallet-kit";
 import Navigation from "@/components/Navigation";
 import StatsOverview, { StatsOverviewProps } from "@/components/StatsOverview";
 import DashboardHeader from "@/components/DashboardHeader";
-import InvoiceList from "@/components/InvoiceList";
+import { BlockchainInvoiceCard } from "@/components/BlockchainInvoiceCard";
 import CreateInvoiceForm, {
   InvoiceFormData,
 } from "@/components/CreateInvoiceForm";
-import { InvoiceData } from "@/components/InvoiceCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DebugPanel } from "@/components/DebugPanel";
-import { useMyInvoices } from "@/hooks/useInvoices";
+import { useSharedInvoices } from "@/hooks/useSharedInvoices";
 import {
   OnChainInvoice,
   InvoiceStatus,
   formatDate,
   getDaysUntilDue,
+  getStatusLabel,
 } from "@/types/invoice";
 import {
   Card,
@@ -38,7 +38,44 @@ import { Button } from "@/components/ui/button";
 
 const BusinessDashboard = () => {
   const { currentAccount } = useWalletKit();
-  const { data: myInvoices, isLoading, error, refetch } = useMyInvoices();
+  // Use useSharedInvoices (same as marketplace) to get ALL invoices from localStorage
+  const { data: allInvoices, isLoading, error, refetch } = useSharedInvoices();
+  
+  // Filter to show only invoices created by the current user (supplier)
+  const myInvoices = useMemo(() => {
+    if (!allInvoices || !currentAccount?.address) return [];
+    
+    console.log("🔍 Filtering Business Dashboard Invoices");
+    console.log("Current user address:", currentAccount.address);
+    console.log("Total invoices loaded:", allInvoices.length);
+    
+    const filtered = allInvoices.filter((inv) => {
+      const isMyInvoice = inv.supplier?.toLowerCase() === currentAccount.address.toLowerCase() ||
+                          inv.issuer?.toLowerCase() === currentAccount.address.toLowerCase();
+      
+      if (isMyInvoice) {
+        console.log("✅ My invoice:", {
+          id: inv.id.slice(0, 8),
+          invoiceNumber: inv.invoiceNumber,
+          status: inv.status,
+          statusLabel: getStatusLabel(inv.status),
+        });
+      }
+      
+      return isMyInvoice;
+    });
+    
+    console.log("My invoices (as supplier):", filtered.length);
+    console.log("Status breakdown:", {
+      created: filtered.filter(i => i.status === InvoiceStatus.CREATED).length,
+      ready: filtered.filter(i => i.status === InvoiceStatus.READY).length,
+      financed: filtered.filter(i => i.status === InvoiceStatus.FINANCED).length,
+      paid: filtered.filter(i => i.status === InvoiceStatus.PAID).length,
+    });
+    
+    return filtered;
+  }, [allInvoices, currentAccount?.address]);
+  
   const [kycStatus, setKycStatus] = useState<
     "approved" | "pending" | "rejected" | "loading"
   >("loading");
@@ -86,6 +123,7 @@ const BusinessDashboard = () => {
       return {
         total: 0,
         active: 0,
+        funded: 0,
         settled: 0,
         totalFinanced: 0,
         pendingAmount: 0,
@@ -96,7 +134,10 @@ const BusinessDashboard = () => {
     const active = myInvoices.filter(
       (inv) =>
         inv.status === InvoiceStatus.CREATED ||
-        inv.status === InvoiceStatus.FINANCED
+        inv.status === InvoiceStatus.READY
+    );
+    const funded = myInvoices.filter(
+      (inv) => inv.status === InvoiceStatus.FINANCED
     );
     const settled = myInvoices.filter(
       (inv) => inv.status === InvoiceStatus.PAID
@@ -108,17 +149,21 @@ const BusinessDashboard = () => {
     );
 
     const totalFinanced = financed.reduce(
-      (sum, inv) => sum + (inv.financedAmountInSui || 0),
+      (sum, inv) => sum + (inv.supplierReceivedInSui || inv.investorPaidInSui || 0),
       0
     );
     const pendingAmount = active.reduce((sum, inv) => sum + inv.amountInSui, 0);
 
-    // Calculate average discount (mock for now, as we don't have discount data on-chain)
-    const avgDiscount = 3.5; // Default mock value
+    // Calculate average discount from actual invoices
+    const invoicesWithDiscount = myInvoices.filter(inv => (inv.discountBps || 0) > 0);
+    const avgDiscount = invoicesWithDiscount.length > 0
+      ? invoicesWithDiscount.reduce((sum, inv) => sum + (inv.discountBps || 0), 0) / invoicesWithDiscount.length / 100
+      : 0;
 
     return {
       total: myInvoices.length,
       active: active.length,
+      funded: funded.length,
       settled: settled.length,
       totalFinanced,
       pendingAmount,
@@ -131,13 +176,13 @@ const BusinessDashboard = () => {
       title: "Total Invoices",
       icon: FileText,
       value: stats.total,
-      description: `${stats.active} active, ${stats.settled} settled`,
+      description: `${stats.active} active, ${stats.funded} funded, ${stats.settled} settled`,
     },
     {
       title: "Total Financed",
       icon: SUILogo,
       value: `${stats.totalFinanced.toFixed(2)} SUI`,
-      description: "Lifetime value",
+      description: `${stats.funded + stats.settled} invoices financed`,
     },
     {
       title: "Pending Amount",
@@ -148,69 +193,50 @@ const BusinessDashboard = () => {
     {
       title: "Avg. Discount",
       icon: TrendingUp,
-      value: `${stats.avgDiscount}%`,
-      description: "Better than average",
-      highlight: true,
+      value: `${stats.avgDiscount.toFixed(2)}%`,
+      description: stats.avgDiscount > 0 ? "Average discount rate" : "No discounts yet",
+      highlight: stats.avgDiscount > 0,
     },
   ];
 
-  // Convert OnChainInvoice to InvoiceData format for display
-  const convertToInvoiceData = (invoice: OnChainInvoice): InvoiceData => {
-    const statusMap: Record<number, "financed" | "listed" | "settled"> = {
-      [InvoiceStatus.CREATED]: "listed",
-      [InvoiceStatus.FINANCED]: "financed",
-      [InvoiceStatus.PAID]: "settled",
-      [InvoiceStatus.DEFAULTED]: "settled",
-    };
-
-    // Use new contract fields if available, fallback to legacy fields
-    const receivedAmount =
-      invoice.status === InvoiceStatus.FINANCED ||
-      invoice.status === InvoiceStatus.PAID
-        ? invoice.supplierReceivedInSui || invoice.financedAmountInSui
-        : undefined;
-
-    const calculatedDiscount = invoice.discountRateBps
-      ? parseFloat(invoice.discountRateBps) / 100 // Convert basis points to percentage
-      : 5; // Mock default
-
-    return {
-      id: invoice.id,
-      invoiceNumber: `Invoice #${invoice.invoiceNumber}`,
-      clientName: invoice.buyer.substring(0, 20) + "...", // Truncated buyer info
-      amount: invoice.amountInSui,
-      receivedAmount,
-      expectedAmount:
-        invoice.status === InvoiceStatus.CREATED
-          ? invoice.amountInSui * 0.95
-          : undefined,
-      discount: calculatedDiscount,
-      dueDate: formatDate(invoice.dueDate),
-      settledDate:
-        invoice.status === InvoiceStatus.PAID
-          ? formatDate(invoice.dueDate)
-          : undefined,
-      status: statusMap[invoice.status] || "listed",
-    };
-  };
-
-  // Filter invoices by status
+  // Filter invoices by status - work directly with OnChainInvoice
   const activeInvoices = useMemo(() => {
     if (!myInvoices) return [];
-    return myInvoices
-      .filter(
-        (inv) =>
-          inv.status === InvoiceStatus.CREATED ||
-          inv.status === InvoiceStatus.FINANCED
-      )
-      .map(convertToInvoiceData);
+    return myInvoices.filter(
+      (inv) =>
+        inv.status === InvoiceStatus.CREATED ||
+        inv.status === InvoiceStatus.READY
+    );
+  }, [myInvoices]);
+
+  const fundedInvoices = useMemo(() => {
+    if (!myInvoices) return [];
+    
+    console.log("🔍 Filtering Funded Invoices");
+    console.log("Total invoices:", myInvoices.length);
+    console.log("Invoice statuses:", myInvoices.map(inv => ({ id: inv.id.slice(0, 8), status: inv.status, statusName: getStatusLabel(inv.status) })));
+    
+    const funded = myInvoices.filter((inv) => {
+      const isFunded = inv.status === InvoiceStatus.FINANCED;
+      if (isFunded) {
+        console.log("✅ Found funded invoice:", {
+          id: inv.id.slice(0, 8),
+          invoiceNumber: inv.invoiceNumber,
+          status: inv.status,
+          financedBy: inv.financedBy,
+          supplierReceived: inv.supplierReceivedInSui,
+        });
+      }
+      return isFunded;
+    });
+    
+    console.log("Funded invoices count:", funded.length);
+    return funded;
   }, [myInvoices]);
 
   const settledInvoices = useMemo(() => {
     if (!myInvoices) return [];
-    return myInvoices
-      .filter((inv) => inv.status === InvoiceStatus.PAID)
-      .map(convertToInvoiceData);
+    return myInvoices.filter((inv) => inv.status === InvoiceStatus.PAID);
   }, [myInvoices]);
 
   const handleCreateInvoice = (data: InvoiceFormData) => {
@@ -222,9 +248,13 @@ const BusinessDashboard = () => {
     }, 3000);
   };
 
-  const handleInvoiceClick = (invoice: InvoiceData) => {
-    console.log("Viewing invoice:", invoice);
-    // TODO: Navigate to invoice detail page or show modal
+  const handleViewDetails = (invoice: OnChainInvoice) => {
+    console.log("Viewing invoice details:", invoice);
+    const network = process.env.NEXT_PUBLIC_NETWORK || "testnet";
+    const url = network === "mainnet"
+      ? `https://suivision.xyz/object/${invoice.id}`
+      : `https://testnet.suivision.xyz/object/${invoice.id}`;
+    window.open(url, '_blank');
   };
 
   // Show wallet connection prompt
@@ -392,6 +422,9 @@ const BusinessDashboard = () => {
               <TabsTrigger value="active">
                 Active Invoices ({activeInvoices.length})
               </TabsTrigger>
+              <TabsTrigger value="funded">
+                Funded ({fundedInvoices.length})
+              </TabsTrigger>
               <TabsTrigger value="settled">
                 Settled ({settledInvoices.length})
               </TabsTrigger>
@@ -418,11 +451,43 @@ const BusinessDashboard = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <InvoiceList
-                  invoices={activeInvoices}
-                  emptyMessage="No active invoices found"
-                  onInvoiceClick={handleInvoiceClick}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {activeInvoices.map((invoice) => (
+                    <BlockchainInvoiceCard
+                      key={invoice.id}
+                      invoice={invoice}
+                      onViewDetails={handleViewDetails}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="funded">
+              {!isLoading && fundedInvoices.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-8">
+                      <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                      <h3 className="text-lg font-semibold mb-2">
+                        No Funded Invoices
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Funded invoices will appear here once an investor finances them
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {fundedInvoices.map((invoice) => (
+                    <BlockchainInvoiceCard
+                      key={invoice.id}
+                      invoice={invoice}
+                      onViewDetails={handleViewDetails}
+                    />
+                  ))}
+                </div>
               )}
             </TabsContent>
 
@@ -442,11 +507,15 @@ const BusinessDashboard = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <InvoiceList
-                  invoices={settledInvoices}
-                  emptyMessage="No settled invoices found"
-                  onInvoiceClick={handleInvoiceClick}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {settledInvoices.map((invoice) => (
+                    <BlockchainInvoiceCard
+                      key={invoice.id}
+                      invoice={invoice}
+                      onViewDetails={handleViewDetails}
+                    />
+                  ))}
+                </div>
               )}
             </TabsContent>
 

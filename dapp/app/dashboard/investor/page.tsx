@@ -12,7 +12,7 @@ import PortfolioDistribution from "@/components/PortfolioDistribution";
 import PerformanceMetrics from "@/components/PerformanceMetrics";
 import { Investment } from "@/components/InvestmentCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMyInvestments } from "@/hooks/useInvoices";
+import { useSharedInvoices } from "@/hooks/useSharedInvoices";
 import { OnChainInvoice, InvoiceStatus, formatDate } from "@/types/invoice";
 import { Loader2, AlertCircle, Wallet, CheckCircle } from "lucide-react";
 import {
@@ -28,7 +28,71 @@ import { DebugPanel } from "@/components/DebugPanel";
 
 const InvestorDashboard = () => {
   const { currentAccount } = useWalletKit();
-  const { data: investments, isLoading, error } = useMyInvestments();
+  // Use useSharedInvoices (same as marketplace) to get ALL invoices from localStorage
+  const { data: allInvoices, isLoading, error } = useSharedInvoices();
+  
+  // Filter to show only invoices financed by the current user (investor)
+  const investments = useMemo(() => {
+    if (!allInvoices || !currentAccount?.address) {
+      console.log("⚠️ Investor Dashboard: No data", { 
+        hasInvoices: !!allInvoices, 
+        hasAccount: !!currentAccount?.address 
+      });
+      return [];
+    }
+    
+    console.log("🔍 Filtering Investor Dashboard Invoices");
+    console.log("Current investor address:", currentAccount.address);
+    console.log("Total invoices loaded:", allInvoices.length);
+    
+    // Log all invoices to see their financedBy field
+    console.log("📊 All invoices with financing status:");
+    allInvoices.forEach((inv, idx) => {
+      console.log(`Invoice ${idx + 1}:`, {
+        id: inv.id.slice(0, 8),
+        invoiceNumber: inv.invoiceNumber,
+        status: inv.status,
+        statusLabel: inv.status === 0 ? "Created" : inv.status === 1 ? "Ready" : inv.status === 2 ? "Financed" : inv.status === 3 ? "Paid" : "Unknown",
+        financedBy: inv.financedBy || "NOT SET",
+        investorPaid: inv.investorPaidInSui,
+        supplier: inv.supplier?.slice(0, 8),
+      });
+    });
+    
+    const filtered = allInvoices.filter((inv) => {
+      // Check if this invoice was financed by the current user
+      // The financedBy field (from investor Option field) should match current wallet address
+      const isMyInvestment = inv.financedBy?.toLowerCase() === currentAccount.address.toLowerCase();
+      
+      if (isMyInvestment) {
+        console.log("✅ MY INVESTMENT FOUND:", {
+          id: inv.id.slice(0, 8),
+          invoiceNumber: inv.invoiceNumber,
+          status: inv.status,
+          investorPaid: inv.investorPaidInSui,
+          supplier: inv.supplier?.slice(0, 8),
+        });
+      }
+      
+      return isMyInvestment;
+    });
+    
+    console.log("My investments (as investor):", filtered.length);
+    console.log("Status breakdown:", {
+      financed: filtered.filter(i => i.status === InvoiceStatus.FINANCED).length,
+      paid: filtered.filter(i => i.status === InvoiceStatus.PAID).length,
+    });
+    
+    if (filtered.length === 0) {
+      console.log("❌ NO INVESTMENTS FOUND - Possible reasons:");
+      console.log("1. Check if any invoices have status = 2 (Financed)");
+      console.log("2. Check if financedBy field matches your wallet:", currentAccount.address);
+      console.log("3. Make sure you financed an invoice in the marketplace");
+    }
+    
+    return filtered;
+  }, [allInvoices, currentAccount?.address]);
+  
   const [kycStatus, setKycStatus] = useState<
     "approved" | "pending" | "rejected" | "loading"
   >("loading");
